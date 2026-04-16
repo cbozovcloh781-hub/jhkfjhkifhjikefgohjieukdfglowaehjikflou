@@ -2020,6 +2020,8 @@ local function StartCommandHandler()
                     itemsToMillion = 0
                 end
                 
+                print("[Command Handler] Прогноз: Осталось $" .. moneyNeeded .. ", Время: " .. hoursToMillion .. "ч " .. minutesToMillion .. "м, Предметов: " .. itemsToMillion)
+                
                 local statsData = {
                     balance = money,
                     uptime = uptime,
