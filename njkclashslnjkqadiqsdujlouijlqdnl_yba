@@ -2283,8 +2283,7 @@ local function StartCommandHandler()
                     lucky_arrows = luckyArrows,
                     lucky_masks = luckyMasks,
                     current_account = game.Players.LocalPlayer.Name,
-                    server_hops = farmStats.serverHops,  -- НОВОЕ: Количество свапов,
-                    server_hops = farmStats.serverHops  -- НОВОЕ: Количество свапов,
+                    server_hops = farmStats.serverHops,  -- НОВОЕ: Количество свапов
                     -- НОВОЕ: Прогноз
                     money_needed = moneyNeeded,
                     time_to_million_seconds = timeToMillion,
