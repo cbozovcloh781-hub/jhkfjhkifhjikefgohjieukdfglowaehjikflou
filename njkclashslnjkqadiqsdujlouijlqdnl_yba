@@ -973,21 +973,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОЧЕНЬ МЕДЛЕННАЯ СКОРОСТЬ БЕЗ ОТКАТОВ
+    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 4%)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 34
-        stepDelay = 0.028
+        stepSize = 35.36
+        stepDelay = 0.02688
     elseif distance < 300 then
-        stepSize = 38
-        stepDelay = 0.026
+        stepSize = 39.52
+        stepDelay = 0.02496
     elseif distance < 600 then
-        stepSize = 40
-        stepDelay = 0.024
+        stepSize = 41.6
+        stepDelay = 0.02304
     else
-        stepSize = 42
-        stepDelay = 0.022
+        stepSize = 43.68
+        stepDelay = 0.02112
     end
     
     local direction = (targetPos - startPos).Unit
@@ -1935,6 +1935,26 @@ local function StartCommandHandler()
                     end
                 end
                 
+                -- НОВОЕ: Расчет прогноза до $1,000,000
+                local moneyNeeded = 1000000 - money
+                local timeToMillion = 0
+                local itemsToMillion = 0
+                
+                if uptime > 60 and farmStats.moneySold > 0 then
+                    -- Скорость фарма денег в секунду
+                    local moneyPerSecond = farmStats.moneySold / uptime
+                    
+                    if moneyPerSecond > 0 and moneyNeeded > 0 then
+                        timeToMillion = math.ceil(moneyNeeded / moneyPerSecond)
+                        
+                        -- Средняя цена проданного предмета
+                        local avgItemPrice = farmStats.itemsSold > 0 and (farmStats.moneySold / farmStats.itemsSold) or 0
+                        if avgItemPrice > 0 then
+                            itemsToMillion = math.ceil(moneyNeeded / avgItemPrice)
+                        end
+                    end
+                end
+                
                 local statsData = {
                     balance = money,
                     uptime = uptime,
@@ -1949,7 +1969,13 @@ local function StartCommandHandler()
                     inventory_sellable_value = sellableValue,
                     lucky_arrows = luckyArrows,
                     lucky_masks = luckyMasks,
-                    current_account = game.Players.LocalPlayer.Name
+                    current_account = game.Players.LocalPlayer.Name,
+                    -- НОВОЕ: Прогноз
+                    money_needed = moneyNeeded,
+                    time_to_million = timeToMillion,
+                    items_to_million = itemsToMillion,
+                    money_per_hour = uptime > 0 and math.floor((farmStats.moneySold / uptime) * 3600) or 0,
+                    items_per_hour = uptime > 0 and math.floor((farmStats.itemsSold / uptime) * 3600) or 0
                 }
                 
                 -- Отправляем статистику на сервер
@@ -1961,7 +1987,11 @@ local function StartCommandHandler()
                     Body = HttpService:JSONEncode(statsData)
                 })
                 
-                print("[Command Handler] Статистика отправлена: " .. response.StatusCode)
+                if response.StatusCode == 200 then
+                    print("[Command Handler] Статистика обновлена: $" .. money .. " | Собрано: " .. farmStats.itemsCollected .. " | Продано: " .. farmStats.itemsSold)
+                else
+                    print("[Command Handler] Ошибка отправки: " .. response.StatusCode)
+                end
             end)
             
             if not success then
@@ -4239,49 +4269,27 @@ if DrawingSupported then
     end
 end
 
--- КРИТИЧНО: Автозагрузчик для server hop (queue_on_teleport)
-local queueFunc = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
+-- АВТОЗАГРУЗКА: Используй yba_autoloader.lua в workspace папке Solara
+-- queue_on_teleport НЕ РАБОТАЕТ в Solara, поэтому используем autoloader
+print("[YBA Enhanced] Для автозагрузки после server hop используй yba_autoloader.lua в workspace")
 
-if queueFunc then
-    print("[YBA Enhanced] queue_on_teleport поддерживается! Автозагрузка активна.")
-    
-    game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(State)
-        if State == Enum.TeleportState.Started then
-            print("[YBA Enhanced] Телепортация началась - сохранение настроек...")
-            
-            -- Сохраняем все настройки перед телепортом
-            _G.YBAAutoRestart = true
-            _G.YBAAutoFarmEnabled = Settings.Autofarm
-            _G.YBAAutoSellEnabled = Settings.Autosell
-            _G.YBAFarmItems = Settings.FarmItems
-            _G.YBASellItems = Settings.SellItems
-            _G.YBAAutoServerHop = Settings.AutoServerHop
-            
-            print("[YBA Enhanced] Настройки сохранены в _G переменные")
-            print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-            print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
-            print("[YBA Enhanced] AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
-            
-            -- КРИТИЧНО: Загружаем скрипт через GitHub URL
-            local scriptCode = [[repeat task.wait() until game:IsLoaded()
-task.wait(2)
-print("[YBA Autoload] Загрузка скрипта с GitHub...")
-local success, err = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"))()
+-- Но сохраняем настройки перед телепортом в _G переменные
+game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(State)
+    if State == Enum.TeleportState.Started then
+        print("[YBA Enhanced] Телепортация началась - сохранение настроек...")
+        
+        _G.YBAAutoRestart = true
+        _G.YBAAutoFarmEnabled = Settings.Autofarm
+        _G.YBAAutoSellEnabled = Settings.Autosell
+        _G.YBAFarmItems = Settings.FarmItems
+        _G.YBASellItems = Settings.SellItems
+        _G.YBAAutoServerHop = Settings.AutoServerHop
+        
+        print("[YBA Enhanced] Настройки сохранены в _G переменные")
+        print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+        print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+    end
 end)
-if success then
-    print("[YBA Autoload] Скрипт загружен успешно!")
-else
-    print("[YBA Autoload] ОШИБКА: " .. tostring(err))
-end]]
-            
-            queueFunc(scriptCode)
-            print("[YBA Enhanced] Скрипт добавлен в queue_on_teleport!")
-        end
-    end)
-else
-    print("[YBA Enhanced] ВНИМАНИЕ: queue_on_teleport не поддерживается! Используй autoexec папку.")
-end
 
 -- УДАЛЕНО: Автозапуск теперь происходит ПОСЛЕ нажатия кнопки Play (см. выше)
 
