@@ -2426,9 +2426,11 @@ end
 
 -- ESP Functions
 local function CreateESP(player)
-    if not DrawingSupported or not Drawing then 
-        print("[ESP] Drawing API not supported")
+    if not DrawingSupported then 
         return 
+    end
+    if not Drawing or not pcall(function() Drawing.new("Line") end) then
+        return
     end
     if player == LocalPlayer then return end
     if Drawings.ESP[player] then RemoveESP(player) end
