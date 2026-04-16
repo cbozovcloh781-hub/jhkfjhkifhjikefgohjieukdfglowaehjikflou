@@ -58,15 +58,24 @@ task.spawn(function()
     
     print("[YBA Enhanced] Кнопка Play видима! Тип: " .. playButton.ClassName)
     
+    -- КРИТИЧНО: Принудительно делаем кнопку активной
+    pcall(function()
+        playButton.Active = true
+        playButton.Visible = true
+    end)
+    
     -- Нажимаем кнопку
     task.wait(0.5)  -- Небольшая задержка для стабильности
     
     local success = false
-    for attempt = 1, 30 do
-        -- Метод 1: firesignal
+    for attempt = 1, 50 do
+        -- Метод 1: firesignal (все возможные события)
         pcall(function()
             firesignal(playButton.MouseButton1Click)
+            firesignal(playButton.MouseButton1Down)
+            firesignal(playButton.MouseButton1Up)
             firesignal(playButton.Activated)
+            firesignal(playButton.MouseEnter)
         end)
         
         -- Метод 2: VirtualInputManager клик по координатам
@@ -76,12 +85,27 @@ task.spawn(function()
             local x = pos.X + size.X/2
             local y = pos.Y + size.Y/2
             game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, true, game, 0)
-            task.wait(0.05)
+            task.wait(0.02)
             game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, false, game, 0)
         end)
         
+        -- Метод 3: Принудительное удаление LoadingScreen
+        if attempt > 25 then
+            pcall(function()
+                loadingScreen.Enabled = false
+                print("[YBA Enhanced] Принудительно отключен LoadingScreen.Enabled")
+            end)
+        end
+        
+        if attempt > 35 then
+            pcall(function()
+                loadingScreen:Destroy()
+                print("[YBA Enhanced] Принудительно удален LoadingScreen")
+            end)
+        end
+        
         -- Проверяем исчез ли LoadingScreen
-        if not loadingScreen.Parent or not loadingScreen.Enabled then
+        if not loadingScreen or not loadingScreen.Parent or not loadingScreen.Enabled then
             print("[YBA Enhanced] LoadingScreen закрылся! Кнопка сработала.")
             success = true
             
@@ -156,7 +180,14 @@ task.spawn(function()
     end
     
     if not success then
-        print("[YBA Enhanced] Не удалось нажать кнопку Play за 30 попыток")
+        print("[YBA Enhanced] Не удалось нажать кнопку Play за 50 попыток")
+        print("[YBA Enhanced] Принудительное удаление LoadingScreen...")
+        pcall(function()
+            if loadingScreen then
+                loadingScreen:Destroy()
+                print("[YBA Enhanced] LoadingScreen удален принудительно!")
+            end
+        end)
     end
 end)
 
@@ -360,11 +391,43 @@ end
 loadSettings()
 
 -- КРИТИЧНО: Инициализируем _G переменные при старте скрипта
-_G.YBAAutoFarmEnabled = Settings.Autofarm or false
-_G.YBAAutoSellEnabled = Settings.Autosell or false
-_G.YBAAutoServerHop = Settings.AutoServerHop or false
-_G.YBAFarmItems = Settings.FarmItems or {}
-_G.YBASellItems = Settings.SellItems or {}
+if _G.YBAAutoFarmEnabled == nil then
+    _G.YBAAutoFarmEnabled = Settings.Autofarm or false
+end
+if _G.YBAAutoSellEnabled == nil then
+    _G.YBAAutoSellEnabled = Settings.Autosell or false
+end
+if _G.YBAAutoServerHop == nil then
+    _G.YBAAutoServerHop = Settings.AutoServerHop or false
+end
+if _G.YBAFarmItems == nil then
+    _G.YBAFarmItems = Settings.FarmItems or {}
+end
+if _G.YBASellItems == nil then
+    _G.YBASellItems = Settings.SellItems or {}
+end
+
+-- КРИТИЧНО: Восстанавливаем настройки из _G если они есть
+if _G.YBAAutoFarmEnabled ~= nil then
+    Settings.Autofarm = _G.YBAAutoFarmEnabled
+    print("[YBA Enhanced] Восстановлено Autofarm: " .. tostring(Settings.Autofarm))
+end
+if _G.YBAAutoSellEnabled ~= nil then
+    Settings.Autosell = _G.YBAAutoSellEnabled
+    print("[YBA Enhanced] Восстановлено Autosell: " .. tostring(Settings.Autosell))
+end
+if _G.YBAAutoServerHop ~= nil then
+    Settings.AutoServerHop = _G.YBAAutoServerHop
+    print("[YBA Enhanced] Восстановлено AutoServerHop: " .. tostring(Settings.AutoServerHop))
+end
+if _G.YBAFarmItems ~= nil then
+    Settings.FarmItems = _G.YBAFarmItems
+    print("[YBA Enhanced] Восстановлено FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+end
+if _G.YBASellItems ~= nil then
+    Settings.SellItems = _G.YBASellItems
+    print("[YBA Enhanced] Восстановлено SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+end
 
 -- КРИТИЧНО: Восстанавливаем счетчики из _G если они есть
 if _G.YBAItemsCollected then
@@ -382,6 +445,12 @@ end
 if _G.YBAMoneySold then
     farmStats.moneySold = _G.YBAMoneySold
     print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
+end
+
+-- КРИТИЧНО: Восстанавливаем состояние ESP из _G
+if _G.YBAESPEnabled ~= nil then
+    ESPSettings.Enabled = _G.YBAESPEnabled
+    print("[YBA Enhanced] Восстановлено ESPEnabled: " .. tostring(ESPSettings.Enabled))
 end
 
 -- Server Hop Function (ДОЛЖНА БЫТЬ ПЕРЕД StartCheaterDetection)
@@ -2638,7 +2707,7 @@ MovementTab:AddSlider("JumpHeight", {
 
 -- ESP Tab
 local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
-ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = false, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false return end ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
+ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false _G.YBAESPEnabled = false return end ESPSettings.Enabled = Value _G.YBAESPEnabled = Value saveSettings() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() end})
@@ -2686,8 +2755,16 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
         Settings.FarmItems = Value
         saveSettings()
         _G.YBAFarmItems = Value
+        print("[YBA Enhanced] FarmItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
+
+-- КРИТИЧНО: Восстанавливаем выбранные предметы из _G
+if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
+    task.wait(0.1)
+    Options.FarmItems:SetValue(_G.YBAFarmItems)
+    print("[YBA Enhanced] FarmItems восстановлены в UI")
+end
 
 AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
@@ -2715,8 +2792,16 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
         Settings.SellItems = Value
         saveSettings()
         _G.YBASellItems = Value
+        print("[YBA Enhanced] SellItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
+
+-- КРИТИЧНО: Восстанавливаем выбранные предметы из _G
+if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
+    task.wait(0.1)
+    Options.SellItems:SetValue(_G.YBASellItems)
+    print("[YBA Enhanced] SellItems восстановлены в UI")
+end
 
 -- === СТАТИСТИКА ===
 AutoTab:AddButton({
@@ -4366,19 +4451,59 @@ end)
 
 -- Apply startup settings after a small delay to ensure everything is loaded
 globalConnections.startupSettings = spawn(function()
-    wait(1)
+    wait(2)  -- Увеличена задержка для полной загрузки UI
     if ScriptDestroyed then return end
     
-    if Settings.Fly then StartFly() end
-    if Settings.NoClip then StartNoClip() end
-    if Settings.Speed then StartSpeed() end
-    if Settings.InfiniteJump then StartInfiniteJump() end
-    if Settings.JumpHack then StartJumpHack() end
-    if Settings.StandControl then StartStandControl() end
-    if Settings.Autofarm then StartAutofarm() end
-    if Settings.Platform then CreateFarmPlatform() end
-    if Settings.AutoServerHop then StartCheaterDetection() end
-    if ESPSettings.Enabled and DrawingSupported then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end
+    print("[YBA Enhanced] === Автозапуск настроек ===")
+    
+    if Settings.Fly then StartFly() print("[YBA Enhanced] Fly запущен") end
+    if Settings.NoClip then StartNoClip() print("[YBA Enhanced] NoClip запущен") end
+    if Settings.Speed then StartSpeed() print("[YBA Enhanced] Speed запущен") end
+    if Settings.InfiniteJump then StartInfiniteJump() print("[YBA Enhanced] InfiniteJump запущен") end
+    if Settings.JumpHack then StartJumpHack() print("[YBA Enhanced] JumpHack запущен") end
+    if Settings.StandControl then StartStandControl() print("[YBA Enhanced] StandControl запущен") end
+    if Settings.Platform then CreateFarmPlatform() print("[YBA Enhanced] Platform создана") end
+    if Settings.AutoServerHop then StartCheaterDetection() print("[YBA Enhanced] CheaterDetection запущен") end
+    
+    -- КРИТИЧНО: Восстанавливаем ESP если он был включен
+    if ESPSettings.Enabled and DrawingSupported then
+        print("[YBA Enhanced] Восстановление ESP...")
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreateESP(player)
+            end
+        end
+        Library:Notify({
+            Title = "ESP",
+            Content = "ESP восстановлен после перезагрузки!",
+            Duration = 3
+        })
+    end
+    
+    -- КРИТИЧНО: Автозапуск автофарма и автопродажи
+    if Settings.Autofarm then
+        print("[YBA Enhanced] Автозапуск автофарма...")
+        task.wait(1)
+        StartAutofarm()
+        Library:Notify({
+            Title = "Автозапуск",
+            Content = "Автофарм запущен автоматически!",
+            Duration = 3
+        })
+    end
+    
+    if Settings.Autosell then
+        print("[YBA Enhanced] Автозапуск автопродажи...")
+        task.wait(0.5)
+        StartAutosell()
+        Library:Notify({
+            Title = "Автозапуск",
+            Content = "Автопродажа запущена автоматически!",
+            Duration = 3
+        })
+    end
+    
+    print("[YBA Enhanced] === Автозапуск завершен ===")
 end)
 
 -- КРИТИЧНО: ВСЕГДА запускаем обработчик команд (даже после server hop)
