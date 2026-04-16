@@ -4308,9 +4308,21 @@ globalConnections.startupSettings = spawn(function()
     if Settings.Platform then CreateFarmPlatform() end
     if Settings.AutoServerHop then StartCheaterDetection() end
     if ESPSettings.Enabled and DrawingSupported then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end
+end)
+
+-- КРИТИЧНО: ВСЕГДА запускаем обработчик команд (даже после server hop)
+globalConnections.commandHandlerAutostart = spawn(function()
+    wait(2)  -- Ждем загрузки UI
+    if ScriptDestroyed then return end
     
-    -- КРИТИЧНО: Запускаем обработчик команд автоматически
+    print("[YBA Enhanced] Автозапуск обработчика команд...")
     StartCommandHandler()
+    
+    Library:Notify({
+        Title = "Обработчик команд",
+        Content = "Запущен автоматически!",
+        Duration = 3
+    })
 end)
 
 -- Save manager setup
