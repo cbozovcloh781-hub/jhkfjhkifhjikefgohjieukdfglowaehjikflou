@@ -396,7 +396,7 @@ local function ServerHop()
         print("[YBA Enhanced] queue_on_teleport поддерживается! Скрипт загрузится автоматически.")
         
         -- ЗАМЕНИ URL НА СВОЙ!
-        local scriptURL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/yba_enhanced_fixed.lua"
+        local scriptURL = "https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"
         
         queueteleport([[loadstring(game:HttpGet("]] .. scriptURL .. [["))()]])
         
@@ -1862,7 +1862,7 @@ local function ExecuteCommand(command, args)
             DestroyAllFunctions()
         end)
         task.wait(1)
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_SCRIPT_URL.lua"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"))()
         return {success = true, message = "Скрипт перезапускается..."}
     elseif command == "get_stats" then
         local money = GetPlayerMoney()
