@@ -393,6 +393,8 @@ local Settings = {}
 local Options = {}
 
 -- Global variables
+
+-- Global variables
 local isFlying = false
 local flyConnections = {}
 local isNoClipping = false
@@ -513,6 +515,9 @@ local function saveSettings()
         writefile("YBA_Enhanced_Settings.json", jsonData)
     end)
 end
+
+-- КРИТИЧНО: Инициализируем Settings перед загрузкой
+Settings = table.clone(DefaultSettings)
 
 loadSettings()
 
