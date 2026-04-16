@@ -156,72 +156,7 @@ task.spawn(function()
         if not loadingScreen or not loadingScreen.Parent or not loadingScreen.Enabled then
             print("[YBA Enhanced] LoadingScreen закрылся! Кнопка сработала.")
             success = true
-            
-            -- КРИТИЧНО: После успешного нажатия кнопки Play запускаем автофарм
-            task.wait(2)  -- Ждем полной загрузки игры
-            
-            -- Проверяем флаг автозапуска
-            if _G.YBAAutoRestart then
-                print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
-                
-                -- Ждем загрузки UI
-                task.wait(3)
-                
-                -- Восстанавливаем настройки
-                if _G.YBAFarmItems then
-                    print("[YBA Enhanced] Восстановление FarmItems")
-                    Settings.FarmItems = _G.YBAFarmItems
-                end
-                if _G.YBASellItems then
-                    print("[YBA Enhanced] Восстановление SellItems")
-                    Settings.SellItems = _G.YBASellItems
-                end
-                if _G.YBAAutoServerHop ~= nil then
-                    Settings.AutoServerHop = _G.YBAAutoServerHop
-                end
-                
-                -- Восстанавливаем выбранные предметы в UI
-                task.wait(1)
-                if Options.FarmItems and Settings.FarmItems then
-                    Options.FarmItems:SetValue(Settings.FarmItems)
-                    print("[YBA Enhanced] FarmItems установлены в UI")
-                end
-                if Options.SellItems and Settings.SellItems then
-                    Options.SellItems:SetValue(Settings.SellItems)
-                    print("[YBA Enhanced] SellItems установлены в UI")
-                end
-                
-                -- АВТОЗАПУСК АВТОФАРМА
-                if _G.YBAAutoFarmEnabled then
-                    print("[YBA Enhanced] Автозапуск автофарма...")
-                    task.wait(1)
-                    Settings.Autofarm = true
-                    StartAutofarm()
-                    
-                    Library:Notify({
-                        Title = "Автозапуск",
-                        Content = "Автофарм запущен после server hop!",
-                        Duration = 5
-                    })
-                end
-                
-                -- АВТОЗАПУСК АВТОПРОДАЖИ
-                if _G.YBAAutoSellEnabled then
-                    print("[YBA Enhanced] Автозапуск автопродажи...")
-                    Settings.Autosell = true
-                    StartAutosell()
-                end
-                
-                -- АВТОЗАПУСК ДЕТЕКТОРА ЧИТЕРОВ
-                if Settings.AutoServerHop then
-                    print("[YBA Enhanced] Автозапуск детектора читеров...")
-                    StartCheaterDetection()
-                end
-                
-                print("[YBA Enhanced] Автозапуск завершен успешно!")
-            end
-            
-            return
+            break  -- КРИТИЧНО: Выходим из цикла сразу
         end
         
         task.wait(0.1)
@@ -236,6 +171,111 @@ task.spawn(function()
                 print("[YBA Enhanced] LoadingScreen удален принудительно!")
             end
         end)
+    end
+    
+    -- КРИТИЧНО: После успешного нажатия кнопки Play запускаем автофарм
+    print("[YBA Enhanced] Ожидание полной загрузки игры...")
+    task.wait(3)  -- Ждем полной загрузки игры
+    
+    -- Проверяем флаг автозапуска
+    if _G.YBAAutoRestart then
+        print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
+        
+        -- Ждем загрузки UI
+        task.wait(2)
+        
+        -- Восстанавливаем настройки
+        if _G.YBAFarmItems then
+            print("[YBA Enhanced] Восстановление FarmItems")
+            Settings.FarmItems = _G.YBAFarmItems
+        end
+        if _G.YBASellItems then
+            print("[YBA Enhanced] Восстановление SellItems")
+            Settings.SellItems = _G.YBASellItems
+        end
+        if _G.YBAAutoServerHop ~= nil then
+            Settings.AutoServerHop = _G.YBAAutoServerHop
+        end
+        
+        -- Восстанавливаем выбранные предметы в UI
+        task.wait(1)
+        if Options.FarmItems and Settings.FarmItems then
+            Options.FarmItems:SetValue(Settings.FarmItems)
+            print("[YBA Enhanced] FarmItems установлены в UI")
+        end
+        if Options.SellItems and Settings.SellItems then
+            Options.SellItems:SetValue(Settings.SellItems)
+            print("[YBA Enhanced] SellItems установлены в UI")
+        end
+        
+        -- АВТОЗАПУСК АВТОФАРМА
+        if _G.YBAAutoFarmEnabled then
+            print("[YBA Enhanced] Автозапуск автофарма...")
+            task.wait(1)
+            Settings.Autofarm = true
+            StartAutofarm()
+            
+            Library:Notify({
+                Title = "Автозапуск",
+                Content = "Автофарм запущен после server hop!",
+                Duration = 5
+            })
+        end
+        
+        -- АВТОЗАПУСК АВТОПРОДАЖИ
+        if _G.YBAAutoSellEnabled then
+            print("[YBA Enhanced] Автозапуск автопродажи...")
+            Settings.Autosell = true
+            StartAutosell()
+        end
+        
+        -- АВТОЗАПУСК ДЕТЕКТОРА ЧИТЕРОВ
+        if Settings.AutoServerHop then
+            print("[YBA Enhanced] Автозапуск детектора читеров...")
+            StartCheaterDetection()
+        end
+        
+        print("[YBA Enhanced] Автозапуск завершен успешно!")
+    else
+        -- ОБЫЧНЫЙ ЗАПУСК (не после server hop)
+        print("[YBA Enhanced] Обычный запуск - проверка настроек...")
+        
+        -- Ждем загрузки UI
+        task.wait(2)
+        
+        -- Если автофарм был включен в настройках - запускаем
+        if Settings.Autofarm then
+            print("[YBA Enhanced] Автозапуск автофарма (из настроек)...")
+            task.wait(1)
+            StartAutofarm()
+            
+            Library:Notify({
+                Title = "Автозапуск",
+                Content = "Автофарм запущен автоматически!",
+                Duration = 3
+            })
+        end
+        
+        -- Если автопродажа была включена - запускаем
+        if Settings.Autosell then
+            print("[YBA Enhanced] Автозапуск автопродажи (из настроек)...")
+            task.wait(0.5)
+            StartAutosell()
+            
+            Library:Notify({
+                Title = "Автозапуск",
+                Content = "Автопродажа запущена автоматически!",
+                Duration = 3
+            })
+        end
+        
+        -- Если детектор читеров был включен - запускаем
+        if Settings.AutoServerHop then
+            print("[YBA Enhanced] Автозапуск детектора читеров (из настроек)...")
+            StartCheaterDetection()
+        end
+        
+        print("[YBA Enhanced] Обычный запуск завершен!")
     end
 end)
 
@@ -4502,7 +4542,7 @@ globalConnections.startupSettings = spawn(function()
     wait(2)  -- Увеличена задержка для полной загрузки UI
     if ScriptDestroyed then return end
     
-    print("[YBA Enhanced] === Автозапуск настроек ===")
+    print("[YBA Enhanced] === Автозапуск настроек (НЕ АВТОФАРМ) ===")
     
     if Settings.Fly then StartFly() print("[YBA Enhanced] Fly запущен") end
     if Settings.NoClip then StartNoClip() print("[YBA Enhanced] NoClip запущен") end
@@ -4511,7 +4551,6 @@ globalConnections.startupSettings = spawn(function()
     if Settings.JumpHack then StartJumpHack() print("[YBA Enhanced] JumpHack запущен") end
     if Settings.StandControl then StartStandControl() print("[YBA Enhanced] StandControl запущен") end
     if Settings.Platform then CreateFarmPlatform() print("[YBA Enhanced] Platform создана") end
-    if Settings.AutoServerHop then StartCheaterDetection() print("[YBA Enhanced] CheaterDetection запущен") end
     
     -- КРИТИЧНО: Восстанавливаем ESP если он был включен
     if ESPSettings.Enabled and DrawingSupported then
@@ -4528,30 +4567,8 @@ globalConnections.startupSettings = spawn(function()
         })
     end
     
-    -- КРИТИЧНО: Автозапуск автофарма и автопродажи
-    if Settings.Autofarm then
-        print("[YBA Enhanced] Автозапуск автофарма...")
-        task.wait(1)
-        StartAutofarm()
-        Library:Notify({
-            Title = "Автозапуск",
-            Content = "Автофарм запущен автоматически!",
-            Duration = 3
-        })
-    end
-    
-    if Settings.Autosell then
-        print("[YBA Enhanced] Автозапуск автопродажи...")
-        task.wait(0.5)
-        StartAutosell()
-        Library:Notify({
-            Title = "Автозапуск",
-            Content = "Автопродажа запущена автоматически!",
-            Duration = 3
-        })
-    end
-    
-    print("[YBA Enhanced] === Автозапуск завершен ===")
+    -- ВАЖНО: Автофарм и автопродажа запускаются ПОСЛЕ нажатия кнопки Play!
+    print("[YBA Enhanced] === Автозапуск завершен (автофарм запустится после Play) ===")
 end)
 
 -- КРИТИЧНО: ВСЕГДА запускаем обработчик команд (даже после server hop)
