@@ -177,6 +177,15 @@ task.spawn(function()
     print("[YBA Enhanced] Ожидание полной загрузки игры...")
     task.wait(3)  -- Ждем полной загрузки игры
     
+    -- ДИАГНОСТИКА: Проверяем _G переменные
+    print("[YBA Enhanced] === ДИАГНОСТИКА _G ПЕРЕМЕННЫХ ===")
+    print("[YBA Enhanced] _G.YBAAutoRestart = " .. tostring(_G.YBAAutoRestart))
+    print("[YBA Enhanced] _G.YBAAutoFarmEnabled = " .. tostring(_G.YBAAutoFarmEnabled))
+    print("[YBA Enhanced] _G.YBAAutoSellEnabled = " .. tostring(_G.YBAAutoSellEnabled))
+    print("[YBA Enhanced] Settings.Autofarm = " .. tostring(Settings.Autofarm))
+    print("[YBA Enhanced] Settings.Autosell = " .. tostring(Settings.Autosell))
+    print("[YBA Enhanced] =============================================")
+    
     -- Проверяем флаг автозапуска
     if _G.YBAAutoRestart then
         print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
@@ -213,6 +222,13 @@ task.spawn(function()
             print("[YBA Enhanced] Автозапуск автофарма...")
             task.wait(1)
             Settings.Autofarm = true
+            
+            -- КРИТИЧНО: Обновляем тумблер в UI
+            if Options.Autofarm then
+                Options.Autofarm:SetValue(true)
+                print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
+            end
+            
             StartAutofarm()
             
             Library:Notify({
@@ -226,6 +242,13 @@ task.spawn(function()
         if _G.YBAAutoSellEnabled then
             print("[YBA Enhanced] Автозапуск автопродажи...")
             Settings.Autosell = true
+            
+            -- КРИТИЧНО: Обновляем тумблер в UI
+            if Options.Autosell then
+                Options.Autosell:SetValue(true)
+                print("[YBA Enhanced] Тумблер Autosell установлен в ON")
+            end
+            
             StartAutosell()
         end
         
@@ -247,6 +270,13 @@ task.spawn(function()
         if Settings.Autofarm then
             print("[YBA Enhanced] Автозапуск автофарма (из настроек)...")
             task.wait(1)
+            
+            -- КРИТИЧНО: Обновляем тумблер в UI
+            if Options.Autofarm then
+                Options.Autofarm:SetValue(true)
+                print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
+            end
+            
             StartAutofarm()
             
             Library:Notify({
@@ -260,6 +290,13 @@ task.spawn(function()
         if Settings.Autosell then
             print("[YBA Enhanced] Автозапуск автопродажи (из настроек)...")
             task.wait(0.5)
+            
+            -- КРИТИЧНО: Обновляем тумблер в UI
+            if Options.Autosell then
+                Options.Autosell:SetValue(true)
+                print("[YBA Enhanced] Тумблер Autosell установлен в ON")
+            end
+            
             StartAutosell()
             
             Library:Notify({
@@ -418,7 +455,8 @@ local farmStats = {
     itemsSold = 0,
     startTime = tick(),
     moneyCollected = 0,
-    moneySold = 0
+    moneySold = 0,
+    serverHops = 0  -- НОВОЕ: Счетчик свапов сервера
 }
 
 -- ESP variables
@@ -534,6 +572,15 @@ if _G.YBAMoneySold then
     farmStats.moneySold = _G.YBAMoneySold
     print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
 end
+if _G.YBAServerHops then
+    farmStats.serverHops = _G.YBAServerHops
+    print("[YBA Enhanced] Восстановлено serverHops: " .. farmStats.serverHops)
+end
+if _G.YBAStartTime then
+    farmStats.startTime = _G.YBAStartTime
+    local totalUptime = math.floor(tick() - farmStats.startTime)
+    print("[YBA Enhanced] Восстановлено startTime: общее время работы " .. totalUptime .. " секунд")
+end
 
 -- КРИТИЧНО: Восстанавливаем состояние ESP из _G
 if _G.YBAESPEnabled ~= nil then
@@ -552,7 +599,7 @@ local function ServerHop()
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
     
-    -- КРИТИЧНО: Сохраняем настройки перед свапом
+    -- КРИТИЧНО: Сохраняем ВСЮ статистику перед свапом
     _G.YBAAutoRestart = true
     _G.YBAAutoFarmEnabled = Settings.Autofarm
     _G.YBAAutoSellEnabled = Settings.Autosell
@@ -560,9 +607,51 @@ local function ServerHop()
     _G.YBASellItems = Settings.SellItems
     _G.YBAAutoServerHop = Settings.AutoServerHop
     
-    print("[YBA Enhanced] Настройки сохранены для автозагрузки")
-    print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-    print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+    -- НОВОЕ: Сохраняем статистику фарма
+    _G.YBAItemsCollected = farmStats.itemsCollected
+    _G.YBAMoneyCollected = farmStats.moneyCollected
+    _G.YBAItemsSold = farmStats.itemsSold
+    _G.YBAMoneySold = farmStats.moneySold
+    _G.YBAServerHops = (farmStats.serverHops or 0) + 1  -- Увеличиваем счетчик свапов
+    _G.YBAStartTime = farmStats.startTime  -- Сохраняем начальное время
+    
+    print("[YBA Enhanced] === СОХРАНЕНИЕ СТАТИСТИКИ ПЕРЕД СВАПОМ ===")
+    print("[YBA Enhanced] Настройки:")
+    print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+    print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+    print("[YBA Enhanced]   AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
+    print("[YBA Enhanced] Статистика:")
+    print("[YBA Enhanced]   Собрано предметов: " .. _G.YBAItemsCollected)
+    print("[YBA Enhanced]   Собрано денег: $" .. _G.YBAMoneyCollected)
+    print("[YBA Enhanced]   Продано предметов: " .. _G.YBAItemsSold)
+    print("[YBA Enhanced]   Продано денег: $" .. _G.YBAMoneySold)
+    print("[YBA Enhanced]   Свапов сервера: " .. _G.YBAServerHops)
+    local totalUptime = math.floor(tick() - _G.YBAStartTime)
+    print("[YBA Enhanced]   Общее время работы: " .. totalUptime .. " секунд")
+    print("[YBA Enhanced] =================================================")
+    
+    -- НОВОЕ: Отправляем уведомление на сервер о свапе
+    pcall(function()
+        local swapData = {
+            action = "server_hop",
+            items_collected = _G.YBAItemsCollected,
+            money_collected = _G.YBAMoneyCollected,
+            items_sold = _G.YBAItemsSold,
+            money_sold = _G.YBAMoneySold,
+            server_hops = _G.YBAServerHops,
+            total_uptime = totalUptime,
+            current_account = game.Players.LocalPlayer.Name
+        }
+        
+        request({
+            Url = "http://localhost:5000/api/server_hop",
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(swapData)
+        })
+        
+        print("[YBA Enhanced] Уведомление о свапе отправлено на сервер")
+    end)
     
     -- КРИТИЧНО: Используем queue_on_teleport для автозагрузки скрипта
     local queueteleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
@@ -2194,6 +2283,8 @@ local function StartCommandHandler()
                     lucky_arrows = luckyArrows,
                     lucky_masks = luckyMasks,
                     current_account = game.Players.LocalPlayer.Name,
+                    server_hops = farmStats.serverHops,  -- НОВОЕ: Количество свапов,
+                    server_hops = farmStats.serverHops  -- НОВОЕ: Количество свапов,
                     -- НОВОЕ: Прогноз
                     money_needed = moneyNeeded,
                     time_to_million_seconds = timeToMillion,
