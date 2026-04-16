@@ -68,39 +68,87 @@ task.spawn(function()
     task.wait(0.5)  -- Небольшая задержка для стабильности
     
     local success = false
-    for attempt = 1, 50 do
-        -- Метод 1: firesignal (все возможные события)
+    for attempt = 1, 100 do  -- Увеличено до 100 попыток
+        -- Метод 1: VirtualInputManager Tab+Enter навигация
         pcall(function()
-            firesignal(playButton.MouseButton1Click)
-            firesignal(playButton.MouseButton1Down)
-            firesignal(playButton.MouseButton1Up)
-            firesignal(playButton.Activated)
-            firesignal(playButton.MouseEnter)
+            local vim = game:GetService("VirtualInputManager")
+            -- Нажимаем Tab несколько раз чтобы выбрать кнопку
+            for i = 1, 5 do
+                vim:SendKeyEvent(true, Enum.KeyCode.Tab, false, game)
+                task.wait(0.03)
+                vim:SendKeyEvent(false, Enum.KeyCode.Tab, false, game)
+                task.wait(0.03)
+            end
+            -- Нажимаем Enter
+            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.05)
+            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
         end)
         
-        -- Метод 2: VirtualInputManager клик по координатам
+        -- Метод 2: GuiService.SelectedObject + Enter
         pcall(function()
-            local pos = playButton.AbsolutePosition
-            local size = playButton.AbsoluteSize
-            local x = pos.X + size.X/2
-            local y = pos.Y + size.Y/2
-            game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, true, game, 0)
-            task.wait(0.02)
-            game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, false, game, 0)
+            game:GetService("GuiService").SelectedObject = playButton
+            task.wait(0.05)
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.05)
+            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
         end)
         
-        -- Метод 3: Принудительное удаление LoadingScreen
-        if attempt > 25 then
+        -- Метод 3: VirtualInputManager Space (альтернатива Enter)
+        pcall(function()
+            game:GetService("GuiService").SelectedObject = playButton
+            task.wait(0.05)
+            local vim = game:GetService("VirtualInputManager")
+            vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.05)
+            vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+        end)
+        
+        -- Метод 4: Прямой вызов функции кнопки (если есть)
+        if attempt % 10 == 0 then
             pcall(function()
-                loadingScreen.Enabled = false
-                print("[YBA Enhanced] Принудительно отключен LoadingScreen.Enabled")
+                if playButton:IsA("GuiButton") or playButton:IsA("TextButton") or playButton:IsA("ImageButton") then
+                    -- Пытаемся найти и вызвать функцию обработчика
+                    for _, connection in pairs(getconnections(playButton.MouseButton1Click)) do
+                        pcall(function()
+                            connection:Fire()
+                        end)
+                    end
+                    for _, connection in pairs(getconnections(playButton.Activated)) do
+                        pcall(function()
+                            connection:Fire()
+                        end)
+                    end
+                end
             end)
         end
         
-        if attempt > 35 then
+        -- Метод 5: Изменение свойств LoadingScreen напрямую
+        if attempt % 20 == 0 then
+            pcall(function()
+                loadingScreen.Enabled = false
+                print("[YBA Enhanced] Попытка " .. attempt .. ": Отключен LoadingScreen.Enabled")
+            end)
+        end
+        
+        -- Метод 6: Удаление всех Frame внутри LoadingScreen
+        if attempt > 50 then
+            pcall(function()
+                for _, child in pairs(loadingScreen:GetChildren()) do
+                    if child:IsA("Frame") or child:IsA("ScreenGui") then
+                        child:Destroy()
+                    end
+                end
+                print("[YBA Enhanced] Попытка " .. attempt .. ": Удалены Frame внутри LoadingScreen")
+            end)
+        end
+        
+        -- Метод 7: Полное удаление LoadingScreen
+        if attempt > 70 then
             pcall(function()
                 loadingScreen:Destroy()
-                print("[YBA Enhanced] Принудительно удален LoadingScreen")
+                print("[YBA Enhanced] Попытка " .. attempt .. ": LoadingScreen удален")
             end)
         end
         
@@ -180,7 +228,7 @@ task.spawn(function()
     end
     
     if not success then
-        print("[YBA Enhanced] Не удалось нажать кнопку Play за 50 попыток")
+        print("[YBA Enhanced] Не удалось нажать кнопку Play за 100 попыток")
         print("[YBA Enhanced] Принудительное удаление LoadingScreen...")
         pcall(function()
             if loadingScreen then
