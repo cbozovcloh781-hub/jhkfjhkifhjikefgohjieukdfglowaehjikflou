@@ -2434,7 +2434,15 @@ local function CreateESP(player)
     if not DrawingSupported then 
         return 
     end
-    if not Drawing or not pcall(function() Drawing.new("Line") end) then
+    if not Drawing then
+        return
+    end
+    -- Additional safety check
+    local testSuccess = pcall(function() 
+        local test = Drawing.new("Line")
+        if test then test:Remove() end
+    end)
+    if not testSuccess then
         return
     end
     if player == LocalPlayer then return end
