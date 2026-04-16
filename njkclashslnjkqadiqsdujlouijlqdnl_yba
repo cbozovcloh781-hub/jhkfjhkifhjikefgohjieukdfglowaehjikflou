@@ -1,0 +1,4331 @@
+-- Проверка на повторный запуск и очистка предыдущего экземпляра
+if _G.YBAEnhancedLoaded then
+    print("[YBA Enhanced] Обнаружен предыдущий экземпляр скрипта. Выполняется очистка...")
+    pcall(function()
+        if _G.YBAEnhancedCleanup then
+            _G.YBAEnhancedCleanup()
+        end
+    end)
+    task.wait(0.5)
+    print("[YBA Enhanced] Очистка завершена. Загрузка новой версии...")
+    _G.YBAEnhancedReloaded = true
+else
+    _G.YBAEnhancedReloaded = false
+end
+_G.YBAEnhancedLoaded = true
+
+-- КРИТИЧНО: Автоматически НАЖИМАЕМ кнопку Play (НЕ удаляем экран!)
+task.spawn(function()
+    local player = game:GetService("Players").LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui", 10)
+    
+    if not playerGui then
+        print("[YBA Enhanced] PlayerGui не найден!")
+        return
+    end
+    
+    -- Ждем появления LoadingScreen
+    local loadingScreen = playerGui:WaitForChild("LoadingScreen", 30)
+    
+    if not loadingScreen then
+        print("[YBA Enhanced] LoadingScreen не появился")
+        return
+    end
+    
+    print("[YBA Enhanced] LoadingScreen обнаружен! Ожидание кнопки Play...")
+    
+    -- Ждем появления структуры
+    local frames = loadingScreen:WaitForChild("Frames", 10)
+    if not frames then return end
+    
+    local main = frames:WaitForChild("Main", 10)
+    if not main then return end
+    
+    local playButton = main:WaitForChild("Play", 10)
+    if not playButton then return end
+    
+    -- Ждем пока кнопка станет видимой
+    local waitTime = 0
+    while not playButton.Visible and waitTime < 30 do
+        task.wait(0.1)
+        waitTime = waitTime + 0.1
+    end
+    
+    if not playButton.Visible then
+        print("[YBA Enhanced] Кнопка Play не стала видимой")
+        return
+    end
+    
+    print("[YBA Enhanced] Кнопка Play видима! Тип: " .. playButton.ClassName)
+    
+    -- Нажимаем кнопку
+    task.wait(0.5)  -- Небольшая задержка для стабильности
+    
+    local success = false
+    for attempt = 1, 30 do
+        -- Метод 1: firesignal
+        pcall(function()
+            firesignal(playButton.MouseButton1Click)
+            firesignal(playButton.Activated)
+        end)
+        
+        -- Метод 2: VirtualInputManager клик по координатам
+        pcall(function()
+            local pos = playButton.AbsolutePosition
+            local size = playButton.AbsoluteSize
+            local x = pos.X + size.X/2
+            local y = pos.Y + size.Y/2
+            game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, true, game, 0)
+            task.wait(0.05)
+            game:GetService("VirtualInputManager"):SendMouseButtonEvent(x, y, 0, false, game, 0)
+        end)
+        
+        -- Проверяем исчез ли LoadingScreen
+        if not loadingScreen.Parent or not loadingScreen.Enabled then
+            print("[YBA Enhanced] LoadingScreen закрылся! Кнопка сработала.")
+            success = true
+            
+            -- КРИТИЧНО: После успешного нажатия кнопки Play запускаем автофарм
+            task.wait(2)  -- Ждем полной загрузки игры
+            
+            -- Проверяем флаг автозапуска
+            if _G.YBAAutoRestart then
+                print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
+                
+                -- Ждем загрузки UI
+                task.wait(3)
+                
+                -- Восстанавливаем настройки
+                if _G.YBAFarmItems then
+                    print("[YBA Enhanced] Восстановление FarmItems")
+                    Settings.FarmItems = _G.YBAFarmItems
+                end
+                if _G.YBASellItems then
+                    print("[YBA Enhanced] Восстановление SellItems")
+                    Settings.SellItems = _G.YBASellItems
+                end
+                if _G.YBAAutoServerHop ~= nil then
+                    Settings.AutoServerHop = _G.YBAAutoServerHop
+                end
+                
+                -- Восстанавливаем выбранные предметы в UI
+                task.wait(1)
+                if Options.FarmItems and Settings.FarmItems then
+                    Options.FarmItems:SetValue(Settings.FarmItems)
+                    print("[YBA Enhanced] FarmItems установлены в UI")
+                end
+                if Options.SellItems and Settings.SellItems then
+                    Options.SellItems:SetValue(Settings.SellItems)
+                    print("[YBA Enhanced] SellItems установлены в UI")
+                end
+                
+                -- АВТОЗАПУСК АВТОФАРМА
+                if _G.YBAAutoFarmEnabled then
+                    print("[YBA Enhanced] Автозапуск автофарма...")
+                    task.wait(1)
+                    Settings.Autofarm = true
+                    StartAutofarm()
+                    
+                    Library:Notify({
+                        Title = "Автозапуск",
+                        Content = "Автофарм запущен после server hop!",
+                        Duration = 5
+                    })
+                end
+                
+                -- АВТОЗАПУСК АВТОПРОДАЖИ
+                if _G.YBAAutoSellEnabled then
+                    print("[YBA Enhanced] Автозапуск автопродажи...")
+                    Settings.Autosell = true
+                    StartAutosell()
+                end
+                
+                -- АВТОЗАПУСК ДЕТЕКТОРА ЧИТЕРОВ
+                if Settings.AutoServerHop then
+                    print("[YBA Enhanced] Автозапуск детектора читеров...")
+                    StartCheaterDetection()
+                end
+                
+                print("[YBA Enhanced] Автозапуск завершен успешно!")
+            end
+            
+            return
+        end
+        
+        task.wait(0.1)
+    end
+    
+    if not success then
+        print("[YBA Enhanced] Не удалось нажать кнопку Play за 30 попыток")
+    end
+end)
+
+-- YBA Enhanced Script with Blade Ball UI
+local Library = loadstring(game:HttpGet("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/SaveManager.luau"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"))()
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+
+local Player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local ScriptDestroyed = false
+
+-- Configuration
+local DefaultSettings = {
+    Theme = "Darker",
+    
+    
+    -- Movement Settings
+    Fly = false,
+    FlySpeed = 50,
+    NoClip = false,
+    Speed = false,
+    SpeedValue = 50,
+    InfiniteJump = false,
+    JumpHeight = 50,
+    JumpHack = false,
+    
+    -- YBA Specific
+    StandControl = false,
+    StandRange = 500,
+    FreezePlayer = true,
+    SwitchCamera = true,
+    AntiTimeStop = false,
+    
+    -- Autofarm
+    Autofarm = false,
+    PickupRadius = 8,
+    FarmItems = {},
+    FarmDelay = 0.3,
+    AutobuyLuckyArrow = false,
+    
+    -- Autosell
+    Autosell = false,
+    SellItems = {},
+    
+    -- Server Hop
+    AutoServerHop = false,
+    CheaterDetectionSensitivity = 3,
+    
+    -- Teleport
+    PlayerTeleport = false,
+    SelectedPlayer = nil,
+    TeleportSpeed = 2000,
+    
+    -- Platform
+    Platform = false,
+    
+    -- Camera
+    UnlockZoom = false,
+    
+    -- Money Farm
+    MoneyFarmEnabled = false,
+    MoneyLimit = 1000000,
+    AutoDropMoney = false,
+    ReceiverUsername = "",
+}
+
+local Settings = {}
+local Options = {}
+
+-- Global variables
+local isFlying = false
+local flyConnections = {}
+local isNoClipping = false
+local noClipConnections = {}
+local isSpeedHacking = false
+local speedConnections = {}
+local isInfiniteJumping = false
+local jumpConnections = {}
+local isJumpHacking = false
+local jumpHackConnections = {}
+local isStandControlActive = false
+local standConnections = {}
+local isAntiTimeStopEnabled = false
+local antiTimeStopConnections = {}
+local isAutofarmEnabled = false
+local autofarmConnections = {}
+local farmItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Lucky Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Lucky Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio Diary", "Gold Coin", "Diamond"}
+local sellItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio Diary", "Gold Coin", "Diamond"}
+local isAutosellEnabled = false
+local autosellConnections = {}
+local isAutobuyEnabled = false
+local autobuyConnections = {}
+local isTeleporting = false
+local teleportConnections = {}
+
+-- Global connections for cleanup
+local globalConnections = {}
+
+-- Platform variable
+local farmPlatform = nil
+
+-- Money Farm variables
+local isMoneyFarmEnabled = false
+local moneyFarmConnections = {}
+local currentMoney = 0
+local lastMoneyCheck = 0
+local lastMillionNotification = 0  -- НОВОЕ: Время последнего уведомления о $1M
+
+-- Цены на предметы (ПРАВИЛЬНЫЕ ЦЕНЫ ИЗ ИГРЫ)
+local itemPrices = {
+    ["Rokakaka"] = 600,
+    ["Pure Rokakaka"] = 1500,
+    ["Mysterious Arrow"] = 200,
+    ["Lucky Arrow"] = 0,
+    ["Zepelin's Headband"] = 1000,
+    ["Quinton's Glove"] = 1000,
+    ["Ancient Scroll"] = 1000,
+    ["Stone Mask"] = 1000,
+    ["Lucky Stone Mask"] = 0,
+    ["Rib Cage of the Saint's Corpse"] = 1200,
+    ["Steel Ball"] = 1000,
+    ["Dio Diary"] = 1000,
+    ["Gold Coin"] = 120,
+    ["Diamond"] = 500
+}
+
+-- Глобальная статистика фарма (ДОЛЖНА БЫТЬ ДО ВСЕХ ФУНКЦИЙ)
+local farmStats = {
+    itemsCollected = 0,
+    itemsSold = 0,
+    startTime = tick(),
+    moneyCollected = 0,
+    moneySold = 0
+}
+
+-- ESP variables
+local Drawings = {ESP = {}, Tracers = {}, Boxes = {}, Healthbars = {}, Names = {}, Distances = {}, Snaplines = {}, Skeleton = {}}
+local Highlights = {}
+local Colors = {Enemy = Color3.fromRGB(255, 25, 25), Ally = Color3.fromRGB(25, 255, 25), Neutral = Color3.fromRGB(255, 255, 255), Selected = Color3.fromRGB(255, 210, 0), Health = Color3.fromRGB(0, 255, 0), Distance = Color3.fromRGB(200, 200, 200), Rainbow = nil, Box = Color3.fromRGB(255, 25, 25), Tracer = Color3.fromRGB(255, 25, 25), Name = Color3.fromRGB(255, 25, 25)}
+local ESPSettings = {Enabled = false, TeamCheck = false, ShowTeam = false, VisibilityCheck = true, BoxESP = false, BoxStyle = "Corner", BoxOutline = true, BoxFilled = false, BoxFillTransparency = 0.5, BoxThickness = 1, TracerESP = false, TracerOrigin = "Bottom", TracerStyle = "Line", TracerThickness = 1, HealthESP = false, HealthStyle = "Bar", HealthBarSide = "Left", HealthTextSuffix = "HP", NameESP = false, NameMode = "DisplayName", ShowDistance = true, DistanceUnit = "studs", TextSize = 14, TextFont = 2, RainbowSpeed = 1, MaxDistance = 1000, RefreshRate = 0.016, Snaplines = false, SnaplineStyle = "Straight", RainbowEnabled = false, RainbowBoxes = false, RainbowTracers = false, RainbowText = false, ChamsEnabled = false, ChamsOutlineColor = Color3.fromRGB(255, 255, 255), ChamsFillColor = Color3.fromRGB(255, 0, 0), ChamsOccludedColor = Color3.fromRGB(150, 0, 0), ChamsTransparency = 0.5, ChamsOutlineTransparency = 0, ChamsOutlineThickness = 0.1, SkeletonESP = false, SkeletonColor = Color3.fromRGB(255, 255, 255), SkeletonThickness = 1.5, SkeletonTransparency = 1}
+local lastESPUpdate = {}
+
+-- Load/Save functions
+local function loadSettings()
+    local success, saved = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(readfile("YBA_Enhanced_Settings.json"))
+    end)
+    if success and saved then
+        for key, value in pairs(DefaultSettings) do
+            Settings[key] = saved[key] ~= nil and saved[key] or value
+        end
+        Settings.Autofarm = false
+        if saved.FarmItems and type(saved.FarmItems) == "table" then
+            Settings.FarmItems = saved.FarmItems
+        else
+            Settings.FarmItems = {}
+        end
+        if saved.SellItems and type(saved.SellItems) == "table" then
+            Settings.SellItems = saved.SellItems
+        else
+            Settings.SellItems = {}
+        end
+        if saved.ESPSettings then for k, v in pairs(saved.ESPSettings) do ESPSettings[k] = v end end
+        if saved.ESPColors then
+            if saved.ESPColors.Box then Colors.Box = Color3.fromRGB(saved.ESPColors.Box.R, saved.ESPColors.Box.G, saved.ESPColors.Box.B) end
+            if saved.ESPColors.Tracer then Colors.Tracer = Color3.fromRGB(saved.ESPColors.Tracer.R, saved.ESPColors.Tracer.G, saved.ESPColors.Tracer.B) end
+            if saved.ESPColors.Name then Colors.Name = Color3.fromRGB(saved.ESPColors.Name.R, saved.ESPColors.Name.G, saved.ESPColors.Name.B) end
+        end
+    else
+        Settings = table.clone(DefaultSettings)
+    end
+end
+
+local function saveSettings()
+    pcall(function()
+        local settingsToSave = table.clone(Settings)
+        settingsToSave.Autofarm = false
+        settingsToSave.FarmItems = Settings.FarmItems
+        settingsToSave.SellItems = Settings.SellItems
+        settingsToSave.ESPSettings = ESPSettings
+        settingsToSave.ESPColors = {Box = {R = Colors.Box.R * 255, G = Colors.Box.G * 255, B = Colors.Box.B * 255}, Tracer = {R = Colors.Tracer.R * 255, G = Colors.Tracer.G * 255, B = Colors.Tracer.B * 255}, Name = {R = Colors.Name.R * 255, G = Colors.Name.G * 255, B = Colors.Name.B * 255}}
+        
+        local jsonData = game:GetService("HttpService"):JSONEncode(settingsToSave)
+        writefile("YBA_Enhanced_Settings.json", jsonData)
+    end)
+end
+
+loadSettings()
+
+-- КРИТИЧНО: Инициализируем _G переменные при старте скрипта
+_G.YBAAutoFarmEnabled = Settings.Autofarm or false
+_G.YBAAutoSellEnabled = Settings.Autosell or false
+_G.YBAAutoServerHop = Settings.AutoServerHop or false
+_G.YBAFarmItems = Settings.FarmItems or {}
+_G.YBASellItems = Settings.SellItems or {}
+
+-- Server Hop Function (ДОЛЖНА БЫТЬ ПЕРЕД StartCheaterDetection)
+local function ServerHop()
+    Library:Notify({
+        Title = "Свап сервера",
+        Content = "Поиск нового сервера...",
+        Duration = 3
+    })
+    
+    local TeleportService = game:GetService("TeleportService")
+    local HttpService = game:GetService("HttpService")
+    
+    local success, result = pcall(function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        
+        if servers and servers.data then
+            local currentServerId = game.JobId
+            local availableServers = {}
+            
+            for _, server in pairs(servers.data) do
+                if server.id ~= currentServerId and server.playing < server.maxPlayers then
+                    table.insert(availableServers, server.id)
+                end
+            end
+            
+            if #availableServers > 0 then
+                local randomServer = availableServers[math.random(1, #availableServers)]
+                
+                -- КРИТИЧНО: Сохраняем настройки перед свапом
+                _G.YBAAutoRestart = true
+                _G.YBAAutoFarmEnabled = Settings.Autofarm
+                _G.YBAAutoSellEnabled = Settings.Autosell
+                _G.YBAFarmItems = Settings.FarmItems
+                _G.YBASellItems = Settings.SellItems
+                _G.YBAAutoServerHop = Settings.AutoServerHop  -- ВАЖНО: Сохраняем статус детектора
+                
+                -- Сохраняем скрипт для автозагрузки
+                _G.YBAScriptURL = "https://raw.githubusercontent.com/YOUR_SCRIPT_URL_HERE.lua"  -- ЗАМЕНИ НА СВОЙ URL!
+                
+                print("[YBA Enhanced] Настройки сохранены для автозагрузки")
+                print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+                print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+                
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player)
+            else
+                Library:Notify({
+                    Title = "Ошибка",
+                    Content = "Не найдено доступных серверов",
+                    Duration = 5
+                })
+            end
+        end
+    end)
+    
+    if not success then
+        Library:Notify({
+            Title = "Ошибка свапа",
+            Content = "Не удалось сменить сервер: " .. tostring(result),
+            Duration = 5
+        })
+    end
+end
+
+-- Cheater Detection System
+local playerPositions = {}
+local cheaterDetections = {}
+local detectedCheatersCount = 0
+local cheaterDetectionEnabled = false
+
+local function StartCheaterDetection()
+    if cheaterDetectionEnabled then return end
+    cheaterDetectionEnabled = true
+    
+    -- КРИТИЧНО: Обновляем _G переменную при запуске детектора
+    _G.YBAAutoServerHop = true
+    
+    Library:Notify({
+        Title = "Детектор читеров",
+        Content = "Система обнаружения читеров активирована",
+        Duration = 3
+    })
+    
+    task.spawn(function()
+        while cheaterDetectionEnabled and Settings.AutoServerHop do
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local currentPos = player.Character.HumanoidRootPart.Position
+                    
+                    if playerPositions[player.UserId] then
+                        local lastPos = playerPositions[player.UserId].Position
+                        local lastTime = playerPositions[player.UserId].Time
+                        local currentTime = tick()
+                        
+                        local distance = (currentPos - lastPos).Magnitude
+                        local timeDiff = currentTime - lastTime
+                        
+                        -- Если игрок переместился больше чем на 200 стадов за 0.5 секунды = читер
+                        if timeDiff > 0.5 and timeDiff < 2 then
+                            local speed = distance / timeDiff
+                            
+                            if speed > 400 then -- 400+ studs/sec = явный телепорт
+                                cheaterDetections[player.UserId] = (cheaterDetections[player.UserId] or 0) + 1
+                                
+                                if cheaterDetections[player.UserId] >= Settings.CheaterDetectionSensitivity then
+                                    detectedCheatersCount = detectedCheatersCount + 1
+                                    
+                                    Library:Notify({
+                                        Title = "Читер обнаружен!",
+                                        Content = player.Name .. " использует телепорт (" .. detectedCheatersCount .. "/3)",
+                                        Duration = 5
+                                    })
+                                    
+                                    cheaterDetections[player.UserId] = 0
+                                    
+                                    if detectedCheatersCount >= 3 then
+                                        Library:Notify({
+                                            Title = "Свап сервера",
+                                            Content = "Обнаружено 3 читера! Смена сервера через 3 секунды...",
+                                            Duration = 3
+                                        })
+                                        
+                                        task.wait(3)
+                                        ServerHop()
+                                        return
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    
+                    playerPositions[player.UserId] = {
+                        Position = currentPos,
+                        Time = tick()
+                    }
+                end
+            end
+            
+            task.wait(0.5)
+        end
+    end)
+end
+
+local function StopCheaterDetection()
+    if not cheaterDetectionEnabled then return end
+    cheaterDetectionEnabled = false
+    playerPositions = {}
+    cheaterDetections = {}
+    detectedCheatersCount = 0
+    
+    -- КРИТИЧНО: Обновляем _G переменную при остановке детектора
+    _G.YBAAutoServerHop = false
+end
+
+-- Utility functions
+local function GetAlivePlayers()
+    local playersList = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(playersList, player.Name)
+        end
+    end
+    return playersList
+end
+
+local function FindPlayer(name)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Name == name or player.DisplayName == name then
+            return player
+        end
+    end
+    return nil
+end
+-- Movement Functions
+local function StartFly()
+    if isFlying then return end
+    isFlying = true
+    
+    local character = Player.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return end
+    
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    
+    local bodyAngularVelocity = Instance.new("BodyAngularVelocity")
+    bodyAngularVelocity.MaxTorque = Vector3.new(0, 9e9, 0)
+    bodyAngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
+    bodyAngularVelocity.Parent = rootPart
+    
+    flyConnections.bodyVelocity = bodyVelocity
+    flyConnections.bodyAngularVelocity = bodyAngularVelocity
+    
+    flyConnections.heartbeat = RunService.Heartbeat:Connect(function()
+        if ScriptDestroyed or not isFlying then return end
+        
+        local camera = workspace.CurrentCamera
+        local lookVector = camera.CFrame.LookVector
+        local rightVector = camera.CFrame.RightVector
+        local upVector = camera.CFrame.UpVector
+        
+        local velocity = Vector3.new(0, 0, 0)
+        
+        -- Forward/Backward
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            velocity = velocity + lookVector * Settings.FlySpeed
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            velocity = velocity - lookVector * Settings.FlySpeed
+        end
+        
+        -- Left/Right
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            velocity = velocity - rightVector * Settings.FlySpeed
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            velocity = velocity + rightVector * Settings.FlySpeed
+        end
+        
+        -- Up/Down
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            velocity = velocity + Vector3.new(0, Settings.FlySpeed, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+            velocity = velocity - Vector3.new(0, Settings.FlySpeed, 0)
+        end
+        
+        bodyVelocity.Velocity = velocity
+    end)
+end
+
+local function StopFly()
+    if not isFlying then return end
+    isFlying = false
+    
+    for _, connection in pairs(flyConnections) do
+        if typeof(connection) == "RBXScriptConnection" then
+            connection:Disconnect()
+        elseif typeof(connection) == "Instance" then
+            connection:Destroy()
+        end
+    end
+    flyConnections = {}
+end
+
+local function StartNoClip()
+    if isNoClipping then return end
+    isNoClipping = true
+    
+    noClipConnections.stepped = RunService.Stepped:Connect(function()
+        if ScriptDestroyed or not isNoClipping then return end
+        
+        local character = Player.Character
+        if not character then return end
+        
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+local function StopNoClip()
+    if not isNoClipping then return end
+    isNoClipping = false
+    
+    for _, connection in pairs(noClipConnections) do
+        connection:Disconnect()
+    end
+    noClipConnections = {}
+    
+    local character = Player.Character
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function StartSpeed()
+    if isSpeedHacking then return end
+    isSpeedHacking = true
+    
+    local function setupSpeedForCharacter(character)
+        if not character then return end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid then return end
+        
+        humanoid.WalkSpeed = Settings.SpeedValue
+        
+        local speedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if isSpeedHacking and humanoid.WalkSpeed ~= Settings.SpeedValue then
+                humanoid.WalkSpeed = Settings.SpeedValue
+            end
+        end)
+        
+        speedConnections[character] = speedConnection
+    end
+    
+    if Player.Character then
+        setupSpeedForCharacter(Player.Character)
+    end
+    
+    speedConnections.characterAdded = Player.CharacterAdded:Connect(function(newCharacter)
+        if not isSpeedHacking then return end
+        wait(0.1)
+        setupSpeedForCharacter(newCharacter)
+    end)
+end
+
+local function StopSpeed()
+    if not isSpeedHacking then return end
+    isSpeedHacking = false
+    
+    for _, connection in pairs(speedConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    speedConnections = {}
+    
+    local character = Player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 16
+        end
+    end
+end
+
+local function StartInfiniteJump()
+    if isInfiniteJumping then return end
+    isInfiniteJumping = true
+    
+    local character = Player.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(0, 9e9, 0)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    
+    jumpConnections.bodyVelocity = bodyVelocity
+    
+    jumpConnections.heartbeat = RunService.Heartbeat:Connect(function()
+        if not isInfiniteJumping then return end
+        
+        local currentCharacter = Player.Character
+        if not currentCharacter or not currentCharacter:FindFirstChild("HumanoidRootPart") then return end
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            if not bodyVelocity.Parent then
+                bodyVelocity.Parent = currentCharacter.HumanoidRootPart
+            end
+            bodyVelocity.Velocity = Vector3.new(0, Settings.JumpHeight, 0)
+        else
+            if bodyVelocity.Parent then
+                bodyVelocity.Parent = nil
+            end
+        end
+    end)
+    
+    jumpConnections.characterAdded = Player.CharacterAdded:Connect(function(newCharacter)
+        if not isInfiniteJumping then return end
+        wait(0.1)
+        
+        local newRootPart = newCharacter:FindFirstChild("HumanoidRootPart")
+        if newRootPart then
+            if jumpConnections.bodyVelocity then
+                jumpConnections.bodyVelocity:Destroy()
+            end
+            
+            local newBodyVelocity = Instance.new("BodyVelocity")
+            newBodyVelocity.MaxForce = Vector3.new(0, 9e9, 0)
+            newBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            newBodyVelocity.Parent = newRootPart
+            
+            jumpConnections.bodyVelocity = newBodyVelocity
+        end
+    end)
+end
+
+local function StopInfiniteJump()
+    if not isInfiniteJumping then return end
+    isInfiniteJumping = false
+    
+    for _, connection in pairs(jumpConnections) do
+        if typeof(connection) == "RBXScriptConnection" then
+            connection:Disconnect()
+        elseif typeof(connection) == "Instance" then
+            connection:Destroy()
+        end
+    end
+    jumpConnections = {}
+end
+
+local function StartJumpHack()
+    if isJumpHacking then return end
+    isJumpHacking = true
+    
+    local function setupJumpForCharacter(character)
+        if not character then return end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid then return end
+        
+        humanoid.JumpPower = Settings.JumpHeight
+        
+        local jumpConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if isJumpHacking and humanoid.JumpPower ~= Settings.JumpHeight then
+                humanoid.JumpPower = Settings.JumpHeight
+            end
+        end)
+        
+        jumpHackConnections[character] = jumpConnection
+    end
+    
+    if Player.Character then
+        setupJumpForCharacter(Player.Character)
+    end
+    
+    jumpHackConnections.characterAdded = Player.CharacterAdded:Connect(function(newCharacter)
+        if not isJumpHacking then return end
+        wait(0.1)
+        setupJumpForCharacter(newCharacter)
+    end)
+end
+
+local function StopJumpHack()
+    if not isJumpHacking then return end
+    isJumpHacking = false
+    
+    for _, connection in pairs(jumpHackConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    jumpHackConnections = {}
+    
+    local character = Player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.JumpPower = 50
+        end
+    end
+end
+
+-- YBA Specific Functions
+local function FindNearestStand()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local playerPosition = character.HumanoidRootPart.Position
+    local nearestStand = nil
+    local shortestDistance = Settings.StandRange
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name:find("Stand") and obj:FindFirstChild("HumanoidRootPart") then
+            local distance = (obj.HumanoidRootPart.Position - playerPosition).Magnitude
+            if distance < shortestDistance then
+                nearestStand = obj
+                shortestDistance = distance
+            end
+        end
+    end
+    
+    return nearestStand
+end
+
+local function StartStandControl()
+    if isStandControlActive then return end
+    isStandControlActive = true
+    
+    local stand = FindNearestStand()
+    if not stand then
+        Library:Notify({
+            Title = "Stand Control",
+            Content = "No stand found nearby",
+            Duration = 3
+        })
+        return
+    end
+    
+    local character = Player.Character
+    if not character then return end
+    
+    if Settings.FreezePlayer then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 0
+            humanoid.JumpPower = 0
+        end
+    end
+    
+    standConnections.heartbeat = RunService.Heartbeat:Connect(function()
+        if not isStandControlActive then return end
+        
+        local mouse = Player:GetMouse()
+        local camera = workspace.CurrentCamera
+        
+        if stand and stand:FindFirstChild("HumanoidRootPart") then
+            local moveVector = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveVector = moveVector + camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveVector = moveVector - camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveVector = moveVector - camera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveVector = moveVector + camera.CFrame.RightVector
+            end
+            
+            if moveVector.Magnitude > 0 then
+                stand.HumanoidRootPart.CFrame = stand.HumanoidRootPart.CFrame + moveVector.Unit * 2
+            end
+        end
+    end)
+end
+
+local function StopStandControl()
+    if not isStandControlActive then return end
+    isStandControlActive = false
+    
+    for _, connection in pairs(standConnections) do
+        connection:Disconnect()
+    end
+    standConnections = {}
+    
+    local character = Player.Character
+    if character and Settings.FreezePlayer then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+        end
+    end
+end
+
+-- БЕЗОПАСНАЯ СИСТЕМА (проверенные значения без киков)
+local lastTeleportPos = nil
+local stuckCheckTimer = 0
+local stuckCounter = 0
+
+local function isPlayerStuck()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local currentPos = character.HumanoidRootPart.Position
+    
+    if lastTeleportPos then
+        local distance = (currentPos - lastTeleportPos).Magnitude
+        if distance < 2 and tick() - stuckCheckTimer > 3 then
+            stuckCounter = stuckCounter + 1
+            if stuckCounter > 3 then
+                return true
+            end
+        else
+            stuckCounter = 0
+        end
+    end
+    
+    lastTeleportPos = currentPos
+    stuckCheckTimer = tick()
+    return false
+end
+
+-- Мгновенный телепорт
+local function instantTeleport(targetPos)
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local rootPart = character.HumanoidRootPart
+    rootPart.CFrame = CFrame.new(targetPos)
+    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+    rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+    
+    return true
+end
+
+-- ПРОВЕРЕННАЯ БЕЗОПАСНАЯ ТЕЛЕПОРТАЦИЯ (НЕ КИКАЕТ, НЕ ОТКАТЫВАЕТ)
+local function bypassTeleport(targetPos)
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local rootPart = character.HumanoidRootPart
+    local startPos = rootPart.Position
+    local distance = (targetPos - startPos).Magnitude
+    
+    -- Если близко - мгновенный телепорт
+    if distance < 40 then
+        instantTeleport(targetPos)
+        return true
+    end
+    
+    -- ОЧЕНЬ МЕДЛЕННАЯ СКОРОСТЬ БЕЗ ОТКАТОВ
+    local stepSize, stepDelay
+    
+    if distance < 100 then
+        stepSize = 34
+        stepDelay = 0.028
+    elseif distance < 300 then
+        stepSize = 38
+        stepDelay = 0.026
+    elseif distance < 600 then
+        stepSize = 40
+        stepDelay = 0.024
+    else
+        stepSize = 42
+        stepDelay = 0.022
+    end
+    
+    local direction = (targetPos - startPos).Unit
+    local steps = math.ceil(distance / stepSize)
+    
+    for i = 1, steps do
+        if not isAutofarmEnabled then break end
+        
+        local stepPos
+        if i == steps then
+            stepPos = targetPos
+        else
+            stepPos = rootPart.Position + (direction * stepSize)
+        end
+        
+        -- Телепорт
+        rootPart.CFrame = CFrame.new(stepPos)
+        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        
+        -- Задержка
+        task.wait(stepDelay)
+    end
+    
+    -- Финальный телепорт
+    instantTeleport(targetPos)
+    task.wait(0.03)
+    
+    return true
+end
+
+local function travelTo(place)
+    local targetPos = place.Position
+    bypassTeleport(targetPos)
+end
+
+local function TeleportToPlayer(targetPlayerName)
+    local targetPlayer = FindPlayer(targetPlayerName)
+    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return false
+    end
+    
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local targetPos = targetPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(-5, 5), 3, math.random(-5, 5))
+    return bypassTeleport(targetPos)
+end
+
+-- Platform Functions
+local function CreateFarmPlatform()
+    if farmPlatform then return end
+    
+    farmPlatform = Instance.new("Part")
+    farmPlatform.Name = "FarmPlatform"
+    farmPlatform.Size = Vector3.new(60, 1, 60)
+    farmPlatform.Material = Enum.Material.Plastic
+    farmPlatform.BrickColor = BrickColor.new("Institutional white")
+    farmPlatform.Anchored = true
+    farmPlatform.CanCollide = true
+    farmPlatform.Transparency = 0
+    farmPlatform.CFrame = CFrame.new(-8.75846672, -650, -196.104782, 1, -3.09766008e-08, 0.00015218537, 3.09784021e-08, 1, -1.18416308e-08, -0.00015218537, 1.18463452e-08, 1)
+    farmPlatform.Parent = workspace
+    
+    -- Add platform label
+    local gui = Instance.new("SurfaceGui")
+    gui.Face = Enum.NormalId.Top
+    gui.Parent = farmPlatform
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "SOSALKIN HUB"
+    label.TextColor3 = Color3.new(0, 0, 0)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.Parent = gui
+end
+
+local function DestroyFarmPlatform()
+    if farmPlatform then
+        farmPlatform:Destroy()
+        farmPlatform = nil
+    end
+end
+
+local function TeleportToPlatform()
+    if not farmPlatform then
+        CreateFarmPlatform()
+    end
+    
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local targetPos = farmPlatform.Position + Vector3.new(math.random(-8, 8), 3, math.random(-8, 8))
+    bypassTeleport(targetPos)
+end
+
+-- Autofarm Functions
+local function FindNearestItem()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local selectedItems = Options.FarmItems and Options.FarmItems.Value or Settings.FarmItems
+    local playerPosition = character.HumanoidRootPart.Position
+    local nearestPrompt = nil
+    local nearestItem = nil
+    local shortestDistance = math.huge
+    
+    local itemSpawns = workspace:FindFirstChild("Item_Spawns")
+    if not itemSpawns then return nil end
+    
+    local itemsFolder = itemSpawns:FindFirstChild("Items")
+    if not itemsFolder then return nil end
+    
+    for _, itemModel in pairs(itemsFolder:GetChildren()) do
+        if itemModel:IsA("Model") then
+            local meshPart = itemModel:FindFirstChild("MeshPart")
+            if meshPart and meshPart:FindFirstChild("PointLight") then
+                local prompt = itemModel:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then
+                    local itemName = prompt.ObjectText or "Unknown"
+                    
+                    local shouldFarm = false
+                    if type(selectedItems) == "table" then
+                        for selectedItem, isSelected in pairs(selectedItems) do
+                            if isSelected and (selectedItem == "All" or itemName == selectedItem) then
+                                shouldFarm = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if shouldFarm then
+                        local distance = (meshPart.Position - playerPosition).Magnitude
+                        if distance < shortestDistance then
+                            nearestPrompt = prompt
+                            nearestItem = meshPart
+                            shortestDistance = distance
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearestPrompt, nearestItem
+end
+
+local function StartAutofarm()
+    if isAutofarmEnabled then return end
+    isAutofarmEnabled = true
+    
+    -- КРИТИЧНО: Обновляем _G переменные при запуске автофарма
+    _G.YBAAutoFarmEnabled = true
+    _G.YBAFarmItems = Settings.FarmItems
+    
+    -- Сбрасываем счетчики при запуске
+    farmStats.itemsCollected = 0
+    farmStats.itemsSold = 0
+    farmStats.moneyCollected = 0
+    farmStats.moneySold = 0
+    farmStats.startTime = tick()
+    
+    if not farmPlatform then
+        CreateFarmPlatform()
+    end
+    
+    if not isNoClipping then
+        StartNoClip()
+    end
+    
+    Library:Notify({
+        Title = "Autofarm",
+        Content = "Автофарм запущен! (Адаптивная скорость)",
+        Duration = 3
+    })
+    
+    local platformTimer = 0
+    local onPlatform = false
+    local platformPos = farmPlatform.Position
+    local mapPatrolPoints = {
+        Vector3.new(platformPos.X, -60, platformPos.Z),
+        Vector3.new(32.29478073120117, -58.0815315246582, 418.4544982910156),
+        Vector3.new(-449.7508544921875, -42.960453033447266, -205.11923217773438),
+        Vector3.new(-17.46112632751465, -43.924129486083984, -744.8727416992188),
+        Vector3.new(704.6179809570312, -83.0170669555664, -158.81675720214844)
+    }
+    
+    local itemsCollected = 0
+    local startTime = tick()
+    
+    task.spawn(function()
+        while isAutofarmEnabled do
+            local character = Player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local rootPart = character.HumanoidRootPart
+                local prompt, item = FindNearestItem()
+                
+                if prompt and item then
+                    platformTimer = 0
+                    onPlatform = false
+                    
+                    -- Проверка на застревание
+                    if isPlayerStuck() then
+                        Library:Notify({
+                            Title = "Autofarm",
+                            Content = "Обнаружено застревание! Возврат на платформу...",
+                            Duration = 3
+                        })
+                        TeleportToPlatform()
+                        stuckCounter = 0
+                        task.wait(1)
+                    end
+                    
+                    local itemName = prompt.ObjectText or "Unknown"
+                    
+                    -- КРИТИЧНО: Настройка промпта для автоматического подбора (БЕЗ КАМЕРЫ)
+                    prompt.MaxActivationDistance = 100
+                    prompt.RequiresLineOfSight = false
+                    prompt.HoldDuration = 0
+                    prompt.Enabled = true
+                    prompt.ClickablePrompt = false
+                    
+                    -- ВАЖНО: Принудительно делаем промпт видимым (обход бага Roblox)
+                    prompt.Style = Enum.ProximityPromptStyle.Default
+                    prompt.UIOffset = Vector2.new(0, 0)
+                    
+                    local targetPos = item.Position + Vector3.new(0, -8, 0)
+                    
+                    -- БЫСТРАЯ телепортация к предмету
+                    bypassTeleport(targetPos)
+                    
+                    -- КРИТИЧНО: Создаем ЯКОРЬ для персонажа (BodyPosition + BodyGyro)
+                    local bodyPos = Instance.new("BodyPosition")
+                    bodyPos.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                    bodyPos.Position = targetPos
+                    bodyPos.P = 10000
+                    bodyPos.D = 1000
+                    bodyPos.Parent = rootPart
+                    
+                    local bodyGyro = Instance.new("BodyGyro")
+                    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                    bodyGyro.CFrame = rootPart.CFrame
+                    bodyGyro.P = 10000
+                    bodyGyro.D = 1000
+                    bodyGyro.Parent = rootPart
+                    
+                    -- Создаем временную невидимую платформу под персонажем
+                    local tempPlatform = Instance.new("Part")
+                    tempPlatform.Name = "TempPickupPlatform"
+                    tempPlatform.Size = Vector3.new(10, 1, 10)
+                    tempPlatform.Position = targetPos - Vector3.new(0, 3, 0)
+                    tempPlatform.Anchored = true
+                    tempPlatform.CanCollide = true
+                    tempPlatform.Transparency = 1
+                    tempPlatform.Parent = workspace
+                    
+                    -- ЖЕСТКАЯ фиксация позиции
+                    rootPart.CFrame = CFrame.new(targetPos)
+                    rootPart.Anchored = true  -- ЯКОРИМ персонажа!
+                    
+                    -- КРИТИЧНО: ПОВОРАЧИВАЕМ КАМЕРУ НА ПРЕДМЕТ!
+                    local camera = workspace.CurrentCamera
+                    local originalCameraCFrame = camera.CFrame
+                    local originalCameraType = camera.CameraType
+                    
+                    -- Делаем камеру скриптовой и направляем на предмет
+                    camera.CameraType = Enum.CameraType.Scriptable
+                    local lookAtPos = item.Position
+                    camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0), lookAtPos)
+                    
+                    -- Задержка для полной стабилизации
+                    task.wait(0.1)
+                    
+                    -- КРИТИЧНО: Принудительно показываем промпт игроку
+                    pcall(function()
+                        prompt.Parent = item
+                        prompt.Enabled = true
+                        task.wait(0.01)
+                    end)
+                    
+                    -- УМЕНЬШЕННОЕ количество попыток (было 50, теперь 10)
+                    local maxAttempts = 10
+                    local attempt = 0
+                    local itemPickedUp = false
+                    
+                    while item:IsDescendantOf(workspace) and attempt < maxAttempts do
+                        attempt = attempt + 1
+                        
+                        -- Каждую попытку направляем камеру на предмет
+                        pcall(function()
+                            if item and item:IsDescendantOf(workspace) then
+                                camera.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0), item.Position)
+                            end
+                        end)
+                        
+                        -- Активация промпта (1 раз за попытку)
+                        pcall(function() fireproximityprompt(prompt, 0, true) end)
+                        
+                        task.wait(0.05)  -- Задержка между попытками
+                        
+                        -- Проверяем подобрался ли предмет
+                        if not item:IsDescendantOf(workspace) then
+                            itemPickedUp = true
+                            break
+                        end
+                    end
+                    
+                    -- ВОЗВРАЩАЕМ КАМЕРУ ОБРАТНО (КРИТИЧНО!)
+                    pcall(function()
+                        camera.CameraType = originalCameraType
+                    end)
+                    
+                    -- РАЗЯКОРИВАЕМ персонажа
+                    rootPart.Anchored = false
+                    
+                    -- Удаляем BodyPosition и BodyGyro
+                    pcall(function() bodyPos:Destroy() end)
+                    pcall(function() bodyGyro:Destroy() end)
+                    
+                    -- Удаляем временную платформу
+                    pcall(function() tempPlatform:Destroy() end)
+                    
+                    -- ЗАДЕРЖКА ПОСЛЕ ПОДБОРА (защита от кика)
+                    if itemPickedUp then
+                        -- КРИТИЧНО: Увеличиваем счетчики СРАЗУ после подбора
+                        local itemPrice = itemPrices[itemName] or 0
+                        
+                        farmStats.itemsCollected = farmStats.itemsCollected + 1
+                        farmStats.moneyCollected = farmStats.moneyCollected + itemPrice
+                        
+                        print("[Autofarm] Собран: " .. itemName .. " ($" .. itemPrice .. ") | Всего: " .. farmStats.itemsCollected .. " предметов")
+                        print("[Autofarm] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
+                        
+                        Library:Notify({
+                            Title = "Предмет собран",
+                            Content = itemName .. " ($" .. itemPrice .. ") [" .. farmStats.itemsCollected .. " всего]",
+                            Duration = 2
+                        })
+                        
+                        task.wait(0.3)  -- 300мс задержка после успешного подбора
+                    else
+                        -- Предмет НЕ подобрался
+                        print("[Autofarm] Не удалось подобрать " .. itemName .. " за 10 попыток")
+                        task.wait(0.5)  -- 500мс если не подобрали (больше задержка)
+                    end
+                elseif not prompt and not item then
+                    if farmPlatform then
+                        local platformPos = farmPlatform.Position
+                        local distX = math.abs(rootPart.Position.X - platformPos.X)
+                        local distZ = math.abs(rootPart.Position.Z - platformPos.Z)
+                        local distY = math.abs(rootPart.Position.Y - platformPos.Y)
+                        
+                        if distX <= 30 and distZ <= 30 and distY <= 10 then
+                            if not onPlatform then
+                                onPlatform = true
+                                platformTimer = tick()
+                            elseif tick() - platformTimer >= 15 then
+                                Library:Notify({
+                                    Title = "Autofarm",
+                                    Content = "Патрулирование карты...",
+                                    Duration = 2
+                                })
+                                
+                                for _, patrolPos in ipairs(mapPatrolPoints) do
+                                    if not isAutofarmEnabled then break end
+                                    bypassTeleport(patrolPos)
+                                    task.wait(0.3)
+                                    local newPrompt, newItem = FindNearestItem()
+                                    if newPrompt and newItem then
+                                        break
+                                    end
+                                end
+                                platformTimer = tick()
+                            end
+                        else
+                            platformTimer = 0
+                            onPlatform = false
+                            if distX > 30 or distZ > 30 or distY > 10 then
+                                TeleportToPlatform()
+                            end
+                        end
+                    end
+                    task.wait(0.5)
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function StopAutofarm()
+    if not isAutofarmEnabled then return end
+    isAutofarmEnabled = false
+    
+    -- КРИТИЧНО: Обновляем _G переменные при остановке автофарма
+    _G.YBAAutoFarmEnabled = false
+    
+    Library:Notify({
+        Title = "Autofarm",
+        Content = "Автофарм остановлен",
+        Duration = 3
+    })
+    
+    if isNoClipping and not Settings.NoClip then
+        StopNoClip()
+    end
+    
+    for _, connection in pairs(autofarmConnections) do
+        connection:Disconnect()
+    end
+    autofarmConnections = {}
+end
+
+-- Money Farm Functions (MUST BE BEFORE StartAutosell)
+local function GetPlayerMoney()
+    local success, money = pcall(function()
+        -- Method 1: Through GUI
+        local moneyLabel = Player.PlayerGui:FindFirstChild("HUD")
+        if moneyLabel then
+            local main = moneyLabel:FindFirstChild("Main")
+            if main then
+                local dropMoney = main:FindFirstChild("DropMoney")
+                if dropMoney then
+                    local moneyText = dropMoney:FindFirstChild("Money")
+                    if moneyText and moneyText.Text then
+                        local cleanText = moneyText.Text:gsub("[$,]", "")
+                        return tonumber(cleanText) or 0
+                    end
+                end
+            end
+        end
+        
+        -- Method 2: Through PlayerStats
+        local playerStats = Player:FindFirstChild("PlayerStats")
+        if playerStats then
+            local moneyValue = playerStats:FindFirstChild("Money")
+            if moneyValue and moneyValue:IsA("NumberValue") then
+                return moneyValue.Value or 0
+            end
+        end
+        
+        return 0
+    end)
+    
+    if success then
+        return money
+    else
+        return 0
+    end
+end
+
+-- Autosell Functions
+local function SellItem(itemName)
+    local character = Player.Character
+    if not character then return false end
+    
+    -- NOT SELLING Lucky Arrow and Lucky Stone Mask
+    if itemName == "Lucky Arrow" or itemName == "Lucky Stone Mask" then
+        return false
+    end
+    
+    local item = Player.Backpack:FindFirstChild(itemName)
+    if not item then return false end
+    
+    -- Equip item
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid:EquipTool(item)
+        task.wait(0.05)
+    end
+    
+    -- Call RemoteEvent for selling
+    local remoteEvent = character:FindFirstChild("RemoteEvent")
+    if remoteEvent then
+        local args = {
+            [1] = "EndDialogue",
+            [2] = {
+                ["NPC"] = "Merchant",
+                ["Option"] = "Option2",
+                ["Dialogue"] = "Dialogue5"
+            }
+        }
+        remoteEvent:FireServer(unpack(args))
+        return true
+    end
+    
+    return false
+end
+
+local function StartAutosell()
+    if isAutosellEnabled then return end
+    isAutosellEnabled = true
+    
+    -- КРИТИЧНО: Обновляем _G переменные при запуске автопродажи
+    _G.YBAAutoSellEnabled = true
+    _G.YBASellItems = Settings.SellItems
+    
+    -- Reset sold items counter
+    farmStats.itemsSold = 0
+    
+    Library:Notify({
+        Title = "Autosell",
+        Content = "Автопродажа запущена! Лимит: $1,000,000",
+        Duration = 3
+    })
+    
+    task.spawn(function()
+        while isAutosellEnabled do
+            local selectedItems = Options.SellItems and Options.SellItems.Value or Settings.SellItems
+            
+            if type(selectedItems) == "table" then
+                local itemsSold = 0
+                local itemsToSell = {}
+                
+                -- Collect all items for sale
+                for _, item in pairs(Player.Backpack:GetChildren()) do
+                    if item:IsA("Tool") then
+                        local shouldSell = false
+                        
+                        for selectedItem, isSelected in pairs(selectedItems) do
+                            if isSelected and (selectedItem == "All" or item.Name == selectedItem) then
+                                shouldSell = true
+                                break
+                            end
+                        end
+                        
+                        if shouldSell then
+                            table.insert(itemsToSell, item.Name)
+                        end
+                    end
+                end
+                
+                -- Sell items one by one with balance check
+                for _, itemName in ipairs(itemsToSell) do
+                    if not isAutosellEnabled then break end
+                    
+                    -- КРИТИЧНО: Проверяем баланс ПЕРЕД каждой продажей
+                    local currentMoney = GetPlayerMoney()
+                    
+                    if currentMoney >= 1000000 then
+                        Library:Notify({
+                            Title = "Autosell",
+                            Content = "Баланс достиг лимита $1,000,000! Автопродажа остановлена.",
+                            Duration = 5
+                        })
+                        
+                        -- Stop autosell
+                        isAutosellEnabled = false
+                        Settings.Autosell = false
+                        _G.YBAAutoSellEnabled = false
+                        
+                        -- Wait until balance drops below 1M
+                        task.spawn(function()
+                            while true do
+                                task.wait(5)
+                                local money = GetPlayerMoney()
+                                if money < 1000000 then
+                                    Library:Notify({
+                                        Title = "Autosell",
+                                        Content = "Баланс упал ниже $1,000,000. Можно включить автопродажу снова.",
+                                        Duration = 5
+                                    })
+                                    break
+                                end
+                            end
+                        end)
+                        
+                        break
+                    end
+                    
+                    -- Проверяем не превысим ли лимит после продажи
+                    local itemPrice = itemPrices[itemName] or 0
+                    
+                    -- НОВАЯ ЛОГИКА: Если близко к лимиту, продаем самый дешевый предмет
+                    if currentMoney + itemPrice > 1000000 then
+                        -- Ищем самый дешевый предмет в инвентаре
+                        local cheapestItem = nil
+                        local cheapestPrice = math.huge
+                        
+                        for _, checkItemName in ipairs(itemsToSell) do
+                            local checkPrice = itemPrices[checkItemName] or 0
+                            if checkPrice > 0 and checkPrice < cheapestPrice then
+                                cheapestItem = checkItemName
+                                cheapestPrice = checkPrice
+                            end
+                        end
+                        
+                        -- Если текущий предмет самый дешевый - продаем его
+                        if itemName == cheapestItem then
+                            print("[Autosell] Продажа " .. itemName .. " ($" .. itemPrice .. ") несмотря на превышение лимита (самый дешевый)")
+                            Library:Notify({
+                                Title = "Autosell",
+                                Content = "Продажа " .. itemName .. " (самый дешевый) для освобождения места",
+                                Duration = 3
+                            })
+                        else
+                            -- Пропускаем более дорогие предметы
+                            print("[Autosell] Пропуск " .. itemName .. " ($" .. itemPrice .. ") - превысит лимит")
+                            continue
+                        end
+                    end
+                    
+                    if SellItem(itemName) then
+                        itemsSold = itemsSold + 1
+                        farmStats.itemsSold = farmStats.itemsSold + 1
+                        farmStats.moneySold = farmStats.moneySold + itemPrice
+                        print("[Autosell] Продан " .. itemName .. " за $" .. itemPrice .. " (баланс: $" .. (currentMoney + itemPrice) .. ")")
+                        print("[Autosell] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
+                    end
+                    task.wait(0.05)
+                end
+                
+                if itemsSold > 0 then
+                    local newBalance = GetPlayerMoney()
+                    Library:Notify({
+                        Title = "Продано",
+                        Content = itemsSold .. " предметов (баланс: $" .. newBalance .. ")",
+                        Duration = 2
+                    })
+                end
+            end
+            
+            task.wait(0.5)
+        end
+    end)
+end
+
+local function StopAutosell()
+    if not isAutosellEnabled then return end
+    isAutosellEnabled = false
+    
+    -- КРИТИЧНО: Обновляем _G переменные при остановке автопродажи
+    _G.YBAAutoSellEnabled = false
+    
+    for _, connection in pairs(autosellConnections) do
+        connection:Disconnect()
+    end
+    autosellConnections = {}
+end
+
+-- Other Money Farm Functions
+local function DropMoney(amount)
+    local success, result = pcall(function()
+        local character = Player.Character
+        if not character then return false end
+        
+        local remoteEvent = character:FindFirstChild("RemoteEvent")
+        if not remoteEvent then return false end
+        
+        -- Use RemoteEvent for money drop
+        local args = {
+            [1] = "DropMoney",
+            [2] = tonumber(amount)
+        }
+        
+        remoteEvent:FireServer(unpack(args))
+        task.wait(0.5)
+        
+        return true
+    end)
+    
+    if success and result then
+        return true
+    else
+        return false
+    end
+end
+
+local function FindNearestMoney()
+    local character = Player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local playerPosition = character.HumanoidRootPart.Position
+    local nearestMoney = nil
+    local shortestDistance = math.huge  -- БЕСКОНЕЧНЫЙ РАДИУС
+    
+    -- Search for dropped money
+    local moneyFolder = workspace:FindFirstChild("Money")
+    if moneyFolder then
+        for _, moneyObj in pairs(moneyFolder:GetChildren()) do
+            if moneyObj:IsA("Model") or moneyObj:IsA("BasePart") then
+                local primaryPart = moneyObj.PrimaryPart or moneyObj:FindFirstChildWhichIsA("BasePart") or moneyObj
+                if primaryPart and primaryPart:IsA("BasePart") then
+                    local distance = (primaryPart.Position - playerPosition).Magnitude
+                    if distance < shortestDistance then
+                        nearestMoney = primaryPart
+                        shortestDistance = distance
+                    end
+                end
+            end
+        end
+    end
+    
+    return nearestMoney, shortestDistance
+end
+
+local function SendMoneyNotification(amount, recipient)
+    local HttpService = game:GetService("HttpService")
+    
+    local data = {
+        action = "money_ready",
+        amount = amount,
+        sender = Player.Name,
+        recipient = recipient or Settings.ReceiverUsername,
+        server_id = game.JobId,
+        place_id = game.PlaceId
+    }
+    
+    local success, response = pcall(function()
+        return request({
+            Url = "http://localhost:5000/api/money",
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+    
+    if success and response then
+        return true
+    else
+        return false
+    end
+end
+
+local function StartMoneyFarm()
+    if isMoneyFarmEnabled then return end
+    isMoneyFarmEnabled = true
+    
+    Library:Notify({
+        Title = "Money Farm",
+        Content = "Мониторинг баланса запущен! Лимит: $" .. Settings.MoneyLimit,
+        Duration = 3
+    })
+    
+    task.spawn(function()
+        while isMoneyFarmEnabled do
+            local money = GetPlayerMoney()
+            currentMoney = money
+            
+            -- Update every 2 seconds
+            if tick() - lastMoneyCheck >= 2 then
+                lastMoneyCheck = tick()
+                
+                -- Check if limit reached
+                if money >= Settings.MoneyLimit then
+                    -- КРИТИЧНО: Проверяем прошло ли 4 часа с последнего уведомления
+                    local timeSinceLastNotif = tick() - lastMillionNotification
+                    local fourHours = 4 * 60 * 60  -- 4 часа в секундах
+                    
+                    if lastMillionNotification == 0 or timeSinceLastNotif >= fourHours then
+                        lastMillionNotification = tick()
+                        
+                        Library:Notify({
+                            Title = "Money Farm",
+                            Content = "Достигнут лимит $" .. Settings.MoneyLimit .. "! Готов к продаже.",
+                            Duration = 5
+                        })
+                        
+                        -- Send notification to Telegram bot
+                        if Settings.ReceiverUsername ~= "" then
+                            SendMoneyNotification(money, Settings.ReceiverUsername)
+                        end
+                        
+                        print("[Money Farm] Уведомление отправлено. Следующее через 4 часа.")
+                    else
+                        -- Показываем сколько осталось до следующего уведомления
+                        local timeLeft = fourHours - timeSinceLastNotif
+                        local hoursLeft = math.floor(timeLeft / 3600)
+                        local minutesLeft = math.floor((timeLeft % 3600) / 60)
+                        print("[Money Farm] Лимит достигнут. Следующее уведомление через " .. hoursLeft .. "ч " .. minutesLeft .. "м")
+                    end
+                    
+                    -- Wait a minute before next check to avoid spam
+                    task.wait(60)
+                end
+            end
+            
+            task.wait(1)
+        end
+    end)
+end
+
+local function StopMoneyFarm()
+    if not isMoneyFarmEnabled then return end
+    isMoneyFarmEnabled = false
+    
+    Library:Notify({
+        Title = "Money Farm",
+        Content = "Мониторинг баланса остановлен",
+        Duration = 3
+    })
+    
+    for _, connection in pairs(moneyFarmConnections) do
+        connection:Disconnect()
+    end
+    moneyFarmConnections = {}
+end
+
+-- Command Handler for Telegram bot
+local commandHandlerEnabled = false
+local commandHandlerConnection = nil
+
+local function ExecuteCommand(command, args)
+    print("[YBA Enhanced] Выполнение команды: " .. command)
+    
+    if command == "toggle_autofarm" then
+        if isAutofarmEnabled then
+            StopAutofarm()
+            return {success = true, message = "Автофарм остановлен"}
+        else
+            StartAutofarm()
+            return {success = true, message = "Автофарм запущен"}
+        end
+    elseif command == "toggle_autosell" then
+        if isAutosellEnabled then
+            StopAutosell()
+            return {success = true, message = "Автопродажа остановлена"}
+        else
+            StartAutosell()
+            return {success = true, message = "Автопродажа запущена"}
+        end
+    elseif command == "drop_money" then
+        local money = GetPlayerMoney()
+        if money > 0 then
+            local success = DropMoney(money)
+            if success then
+                return {success = true, message = "Дропнуто $" .. money}
+            else
+                return {success = false, message = "Ошибка дропа денег"}
+            end
+        else
+            return {success = false, message = "Нет денег для дропа"}
+        end
+    elseif command == "restart_script" then
+        pcall(function()
+            DestroyAllFunctions()
+        end)
+        task.wait(1)
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_SCRIPT_URL.lua"))()
+        return {success = true, message = "Скрипт перезапускается..."}
+    elseif command == "get_stats" then
+        local money = GetPlayerMoney()
+        local uptime = math.floor(tick() - farmStats.startTime)
+        
+        -- НОВОЕ: Подсчет инвентаря
+        local totalItems = 0
+        local sellableItems = 0
+        local sellableValue = 0
+        local luckyArrows = 0
+        local luckyMasks = 0
+        
+        for _, item in pairs(Player.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                totalItems = totalItems + 1
+                
+                if item.Name == "Lucky Arrow" then
+                    luckyArrows = luckyArrows + 1
+                elseif item.Name == "Lucky Stone Mask" then
+                    luckyMasks = luckyMasks + 1
+                end
+                
+                local itemPrice = itemPrices[item.Name] or 0
+                if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                    sellableItems = sellableItems + 1
+                    sellableValue = sellableValue + itemPrice
+                end
+            end
+        end
+        
+        local statsData = {
+            balance = money,
+            uptime = uptime,
+            items_collected = farmStats.itemsCollected,
+            items_sold = farmStats.itemsSold,
+            money_collected = farmStats.moneyCollected,
+            money_sold = farmStats.moneySold,
+            autofarm_status = isAutofarmEnabled,
+            autosell_status = isAutosellEnabled,
+            -- НОВОЕ: Статистика инвентаря
+            inventory_total = totalItems,
+            inventory_sellable = sellableItems,
+            inventory_sellable_value = sellableValue,
+            lucky_arrows = luckyArrows,
+            lucky_masks = luckyMasks,
+            current_account = game.Players.LocalPlayer.Name
+        }
+        
+        -- Отправляем статистику на сервер
+        local HttpService = game:GetService("HttpService")
+        pcall(function()
+            request({
+                Url = "http://localhost:5000/api/stats",
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(statsData)
+            })
+        end)
+        
+        return {success = true, message = "Статистика отправлена", data = statsData}
+    else
+        return {success = false, message = "Неизвестная команда: " .. command}
+    end
+end
+
+local function StartCommandHandler()
+    if commandHandlerEnabled then return end
+    commandHandlerEnabled = true
+    
+    print("[YBA Enhanced] Запуск обработчика команд...")
+    
+    -- КРИТИЧНО: Автоматическая отправка статистики каждые 5 секунд
+    task.spawn(function()
+        while commandHandlerEnabled do
+            -- Отправляем статистику на сервер
+            local success, err = pcall(function()
+                local money = GetPlayerMoney()
+                local uptime = math.floor(tick() - farmStats.startTime)
+                
+                -- Подсчет инвентаря
+                local totalItems = 0
+                local sellableItems = 0
+                local sellableValue = 0
+                local luckyArrows = 0
+                local luckyMasks = 0
+                
+                for _, item in pairs(Player.Backpack:GetChildren()) do
+                    if item:IsA("Tool") then
+                        totalItems = totalItems + 1
+                        
+                        if item.Name == "Lucky Arrow" then
+                            luckyArrows = luckyArrows + 1
+                        elseif item.Name == "Lucky Stone Mask" then
+                            luckyMasks = luckyMasks + 1
+                        end
+                        
+                        local itemPrice = itemPrices[item.Name] or 0
+                        if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                            sellableItems = sellableItems + 1
+                            sellableValue = sellableValue + itemPrice
+                        end
+                    end
+                end
+                
+                local statsData = {
+                    balance = money,
+                    uptime = uptime,
+                    items_collected = farmStats.itemsCollected,
+                    items_sold = farmStats.itemsSold,
+                    money_collected = farmStats.moneyCollected,
+                    money_sold = farmStats.moneySold,
+                    autofarm_status = isAutofarmEnabled,
+                    autosell_status = isAutosellEnabled,
+                    inventory_total = totalItems,
+                    inventory_sellable = sellableItems,
+                    inventory_sellable_value = sellableValue,
+                    lucky_arrows = luckyArrows,
+                    lucky_masks = luckyMasks,
+                    current_account = game.Players.LocalPlayer.Name
+                }
+                
+                -- Отправляем статистику на сервер
+                local HttpService = game:GetService("HttpService")
+                local response = request({
+                    Url = "http://localhost:5000/api/stats",
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(statsData)
+                })
+                
+                print("[Command Handler] Статистика отправлена: " .. response.StatusCode)
+            end)
+            
+            if not success then
+                print("[Command Handler] Ошибка отправки статистики: " .. tostring(err))
+            end
+            
+            task.wait(5)  -- Отправляем каждые 5 секунд
+        end
+    end)
+    
+    task.spawn(function()
+        while commandHandlerEnabled do
+            local success, response = pcall(function()
+                return request({
+                    Url = "http://localhost:5000/api/commands",
+                    Method = "GET"
+                })
+            end)
+            
+            if success and response and response.StatusCode == 200 then
+                local data = game:GetService("HttpService"):JSONDecode(response.Body)
+                
+                if data.commands and #data.commands > 0 then
+                    for _, cmd in ipairs(data.commands) do
+                        print("[YBA Enhanced] Получена команда: " .. cmd.command)
+                        local result = ExecuteCommand(cmd.command, cmd.args or {})
+                        print("[YBA Enhanced] Результат: " .. (result.message or "OK"))
+                    end
+                end
+            end
+            
+            task.wait(2)
+        end
+    end)
+end
+
+local function StopCommandHandler()
+    if not commandHandlerEnabled then return end
+    commandHandlerEnabled = false
+    print("[YBA Enhanced] Обработчик команд остановлен")
+end
+
+-- Autobuy Functions
+local function BuyLuckyArrow()
+    -- Метод 1: Через GUI магазина (НОВЫЙ)
+    local success1, result1 = pcall(function()
+        local button = game:GetService("Players").LocalPlayer.PlayerGui.HUD.Main.Frames.Store.List.ItemShop.List["1x Lucky Arrow"]
+        if button then
+            for i = 1, 3 do
+                pcall(function()
+                    firesignal(button.MouseButton1Click)
+                end)
+                pcall(function()
+                    firesignal(button.Activated)
+                end)
+                task.wait(0.1)
+            end
+            print("[Autobuy] Lucky Arrow куплена через GUI магазина")
+            return true
+        end
+        return false
+    end)
+    
+    if success1 and result1 then
+        return true
+    end
+    
+    -- Метод 2: Через RemoteEvent (СТАРЫЙ)
+    local success2, result2 = pcall(function()
+        local args = {
+            [1] = "EndDialogue",
+            [2] = {
+                ["NPC"] = "Merchant",
+                ["Option"] = "Option1",
+                ["Dialogue"] = "Dialogue1"
+            }
+        }
+        
+        local character = Player.Character
+        if character and character:FindFirstChild("RemoteEvent") then
+            character.RemoteEvent:FireServer(unpack(args))
+            print("[Autobuy] Lucky Arrow куплена через RemoteEvent")
+            return true
+        end
+        return false
+    end)
+    
+    if success2 and result2 then
+        return true
+    end
+    
+    return false
+end
+
+local function StartAutobuy()
+    if isAutobuyEnabled then return end
+    isAutobuyEnabled = true
+    
+    task.spawn(function()
+        while isAutobuyEnabled do
+            BuyLuckyArrow()
+            task.wait(1)
+        end
+    end)
+end
+
+local function StopAutobuy()
+    if not isAutobuyEnabled then return end
+    isAutobuyEnabled = false
+    
+    for _, connection in pairs(autobuyConnections) do
+        connection:Disconnect()
+    end
+    autobuyConnections = {}
+end
+
+-- ESP Functions
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    if Drawings.ESP[player] then RemoveESP(player) end
+    if not Drawing then return end
+    
+    local success, err = pcall(function()
+        local box = {TopLeft = Drawing.new("Line"), TopRight = Drawing.new("Line"), BottomLeft = Drawing.new("Line"), BottomRight = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line"), Top = Drawing.new("Line"), Bottom = Drawing.new("Line")}
+        for _, line in pairs(box) do line.Visible = false line.Color = Colors.Enemy line.Thickness = ESPSettings.BoxThickness if line == box.Fill then line.Filled = true line.Transparency = ESPSettings.BoxFillTransparency end end
+        
+        local tracer = Drawing.new("Line") tracer.Visible = false tracer.Color = Colors.Enemy tracer.Thickness = ESPSettings.TracerThickness
+        
+        local healthBar = {Outline = Drawing.new("Square"), Fill = Drawing.new("Square"), Text = Drawing.new("Text")}
+        for _, obj in pairs(healthBar) do obj.Visible = false if obj == healthBar.Fill then obj.Color = Colors.Health obj.Filled = true elseif obj == healthBar.Text then obj.Center = true obj.Size = ESPSettings.TextSize obj.Color = Colors.Health obj.Font = ESPSettings.TextFont end end
+        
+        local info = {Name = Drawing.new("Text"), Distance = Drawing.new("Text")}
+        for _, text in pairs(info) do text.Visible = false text.Center = true text.Size = ESPSettings.TextSize text.Color = Colors.Enemy text.Font = ESPSettings.TextFont text.Outline = true end
+        
+        local snapline = Drawing.new("Line") snapline.Visible = false snapline.Color = Colors.Enemy snapline.Thickness = 1
+        
+        local highlight = Instance.new("Highlight") highlight.FillColor = ESPSettings.ChamsFillColor highlight.OutlineColor = ESPSettings.ChamsOutlineColor highlight.FillTransparency = ESPSettings.ChamsTransparency highlight.OutlineTransparency = ESPSettings.ChamsOutlineTransparency highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop highlight.Enabled = ESPSettings.ChamsEnabled
+        Highlights[player] = highlight
+        
+        local skeleton = {Head = Drawing.new("Line"), Neck = Drawing.new("Line"), UpperSpine = Drawing.new("Line"), LowerSpine = Drawing.new("Line"), LeftShoulder = Drawing.new("Line"), LeftUpperArm = Drawing.new("Line"), LeftLowerArm = Drawing.new("Line"), LeftHand = Drawing.new("Line"), RightShoulder = Drawing.new("Line"), RightUpperArm = Drawing.new("Line"), RightLowerArm = Drawing.new("Line"), RightHand = Drawing.new("Line"), LeftHip = Drawing.new("Line"), LeftUpperLeg = Drawing.new("Line"), LeftLowerLeg = Drawing.new("Line"), LeftFoot = Drawing.new("Line"), RightHip = Drawing.new("Line"), RightUpperLeg = Drawing.new("Line"), RightLowerLeg = Drawing.new("Line"), RightFoot = Drawing.new("Line")}
+        for _, line in pairs(skeleton) do line.Visible = false line.Color = ESPSettings.SkeletonColor line.Thickness = ESPSettings.SkeletonThickness line.Transparency = ESPSettings.SkeletonTransparency end
+        
+        Drawings.Skeleton[player] = skeleton
+        Drawings.ESP[player] = {Box = box, Tracer = tracer, HealthBar = healthBar, Info = info, Snapline = snapline}
+    end)
+end
+
+local function RemoveESP(player)
+    local esp = Drawings.ESP[player]
+    if esp then 
+        if esp.Box then for _, obj in pairs(esp.Box) do pcall(function() obj:Remove() end) end end
+        if esp.Tracer then pcall(function() esp.Tracer:Remove() end) end
+        if esp.HealthBar then for _, obj in pairs(esp.HealthBar) do pcall(function() obj:Remove() end) end end
+        if esp.Info then for _, obj in pairs(esp.Info) do pcall(function() obj:Remove() end) end end
+        if esp.Snapline then pcall(function() esp.Snapline:Remove() end) end
+        Drawings.ESP[player] = nil 
+    end
+    local highlight = Highlights[player] 
+    if highlight then pcall(function() highlight:Destroy() end) Highlights[player] = nil end
+    local skeleton = Drawings.Skeleton[player] 
+    if skeleton then for _, line in pairs(skeleton) do pcall(function() line:Remove() end) end Drawings.Skeleton[player] = nil end
+end
+
+local function GetPlayerColor(player, colorType)
+    if ESPSettings.RainbowEnabled then
+        if colorType == "box" and ESPSettings.RainbowBoxes and ESPSettings.BoxESP then return Colors.Rainbow end
+        if colorType == "tracer" and ESPSettings.RainbowTracers and ESPSettings.TracerESP then return Colors.Rainbow end
+        if colorType == "text" and ESPSettings.RainbowText and (ESPSettings.NameESP or ESPSettings.HealthESP) then return Colors.Rainbow end
+    end
+    if colorType == "box" then return Colors.Box end
+    if colorType == "tracer" then return Colors.Tracer end
+    if colorType == "name" then return Colors.Name end
+    return player.Team == LocalPlayer.Team and Colors.Ally or Colors.Enemy
+end
+
+local function GetBoxCorners(cf, size)
+    local corners = {Vector3.new(-size.X/2, -size.Y/2, -size.Z/2), Vector3.new(-size.X/2, -size.Y/2, size.Z/2), Vector3.new(-size.X/2, size.Y/2, -size.Z/2), Vector3.new(-size.X/2, size.Y/2, size.Z/2), Vector3.new(size.X/2, -size.Y/2, -size.Z/2), Vector3.new(size.X/2, -size.Y/2, size.Z/2), Vector3.new(size.X/2, size.Y/2, -size.Z/2), Vector3.new(size.X/2, size.Y/2, size.Z/2)}
+    for i, corner in ipairs(corners) do corners[i] = cf:PointToWorldSpace(corner) end
+    return corners
+end
+
+local function GetTracerOrigin()
+    local origin = ESPSettings.TracerOrigin
+    if origin == "Bottom" then return Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+    elseif origin == "Top" then return Vector2.new(Camera.ViewportSize.X/2, 0)
+    elseif origin == "Mouse" then return UserInputService:GetMouseLocation()
+    else return Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2) end
+end
+
+local function HideESP(player)
+    local esp = Drawings.ESP[player]
+    if esp then
+        for _, obj in pairs(esp.Box) do 
+            if obj then obj.Visible = false end 
+        end
+        if esp.Tracer then esp.Tracer.Visible = false end
+        if esp.HealthBar then
+            for _, obj in pairs(esp.HealthBar) do 
+                if obj then obj.Visible = false end 
+            end
+        end
+        if esp.Info then
+            for _, obj in pairs(esp.Info) do 
+                if obj then obj.Visible = false end 
+            end
+        end
+        if esp.Snapline then esp.Snapline.Visible = false end
+    end
+    local skeleton = Drawings.Skeleton[player]
+    if skeleton then 
+        for _, line in pairs(skeleton) do 
+            if line then line.Visible = false end 
+        end 
+    end
+    local highlight = Highlights[player]
+    if highlight then highlight.Enabled = false end
+end
+
+local function DisableESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        HideESP(player)
+    end
+end
+
+local function UpdateESP(player)
+    if not ESPSettings.Enabled then return end
+    
+    local esp = Drawings.ESP[player]
+    if not esp then return end
+    
+    local character = player.Character
+    if not character then HideESP(player) return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not rootPart or not humanoid or humanoid.Health <= 0 then HideESP(player) return end
+    
+    local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+    if not onScreen or distance > ESPSettings.MaxDistance or pos.Z <= 0 then HideESP(player) return end
+    if ESPSettings.TeamCheck and player.Team == LocalPlayer.Team and not ESPSettings.ShowTeam then HideESP(player) return end
+    local size = character:GetExtentsSize() local cf = rootPart.CFrame
+    local top = Camera:WorldToViewportPoint((cf * CFrame.new(0, size.Y/2, 0)).Position) local bottom = Camera:WorldToViewportPoint((cf * CFrame.new(0, -size.Y/2, 0)).Position)
+    local screenSize = bottom.Y - top.Y local boxWidth = screenSize * 0.65 local boxPosition = Vector2.new(top.X - boxWidth/2, top.Y) local boxSize = Vector2.new(boxWidth, screenSize)
+    for _, obj in pairs(esp.Box) do obj.Visible = false end
+    if ESPSettings.BoxESP then
+        if ESPSettings.BoxStyle == "Corner" then
+            local cornerSize = boxWidth * 0.2
+            esp.Box.TopLeft.From = boxPosition esp.Box.TopLeft.To = boxPosition + Vector2.new(cornerSize, 0) esp.Box.TopLeft.Visible = true
+            esp.Box.TopRight.From = boxPosition + Vector2.new(boxSize.X, 0) esp.Box.TopRight.To = boxPosition + Vector2.new(boxSize.X - cornerSize, 0) esp.Box.TopRight.Visible = true
+            esp.Box.BottomLeft.From = boxPosition + Vector2.new(0, boxSize.Y) esp.Box.BottomLeft.To = boxPosition + Vector2.new(cornerSize, boxSize.Y) esp.Box.BottomLeft.Visible = true
+            esp.Box.BottomRight.From = boxPosition + Vector2.new(boxSize.X, boxSize.Y) esp.Box.BottomRight.To = boxPosition + Vector2.new(boxSize.X - cornerSize, boxSize.Y) esp.Box.BottomRight.Visible = true
+            esp.Box.Left.From = boxPosition esp.Box.Left.To = boxPosition + Vector2.new(0, cornerSize) esp.Box.Left.Visible = true
+            esp.Box.Right.From = boxPosition + Vector2.new(boxSize.X, 0) esp.Box.Right.To = boxPosition + Vector2.new(boxSize.X, cornerSize) esp.Box.Right.Visible = true
+            esp.Box.Top.From = boxPosition + Vector2.new(0, boxSize.Y) esp.Box.Top.To = boxPosition + Vector2.new(0, boxSize.Y - cornerSize) esp.Box.Top.Visible = true
+            esp.Box.Bottom.From = boxPosition + Vector2.new(boxSize.X, boxSize.Y) esp.Box.Bottom.To = boxPosition + Vector2.new(boxSize.X, boxSize.Y - cornerSize) esp.Box.Bottom.Visible = true
+            for _, line in pairs(esp.Box) do line.Color = GetPlayerColor(player, "box") end
+        else
+            esp.Box.Left.From = boxPosition esp.Box.Left.To = boxPosition + Vector2.new(0, boxSize.Y) esp.Box.Left.Visible = true
+            esp.Box.Right.From = boxPosition + Vector2.new(boxSize.X, 0) esp.Box.Right.To = boxPosition + Vector2.new(boxSize.X, boxSize.Y) esp.Box.Right.Visible = true
+            esp.Box.Top.From = boxPosition esp.Box.Top.To = boxPosition + Vector2.new(boxSize.X, 0) esp.Box.Top.Visible = true
+            esp.Box.Bottom.From = boxPosition + Vector2.new(0, boxSize.Y) esp.Box.Bottom.To = boxPosition + Vector2.new(boxSize.X, boxSize.Y) esp.Box.Bottom.Visible = true
+            local boxColor = GetPlayerColor(player, "box") esp.Box.Left.Color = boxColor esp.Box.Right.Color = boxColor esp.Box.Top.Color = boxColor esp.Box.Bottom.Color = boxColor
+        end
+    end
+    if ESPSettings.TracerESP then esp.Tracer.From = GetTracerOrigin() esp.Tracer.To = Vector2.new(pos.X, pos.Y) esp.Tracer.Color = GetPlayerColor(player, "tracer") esp.Tracer.Visible = true else esp.Tracer.Visible = false end
+    if ESPSettings.HealthESP then
+        local health = humanoid.Health local maxHealth = humanoid.MaxHealth local healthPercent = health/maxHealth local barHeight = screenSize * 0.8 local barWidth = 4 local barPos = Vector2.new(boxPosition.X - barWidth - 2, boxPosition.Y + (screenSize - barHeight)/2)
+        esp.HealthBar.Outline.Size = Vector2.new(barWidth, barHeight) esp.HealthBar.Outline.Position = barPos esp.HealthBar.Outline.Visible = true esp.HealthBar.Fill.Size = Vector2.new(barWidth - 2, barHeight * healthPercent) esp.HealthBar.Fill.Position = Vector2.new(barPos.X + 1, barPos.Y + barHeight * (1-healthPercent)) esp.HealthBar.Fill.Color = Color3.fromRGB(255 - (255 * healthPercent), 255 * healthPercent, 0) esp.HealthBar.Fill.Visible = true
+        if ESPSettings.HealthStyle == "Both" or ESPSettings.HealthStyle == "Text" then esp.HealthBar.Text.Text = math.floor(health) .. "HP" esp.HealthBar.Text.Position = Vector2.new(barPos.X + barWidth + 2, barPos.Y + barHeight/2) esp.HealthBar.Text.Visible = true else esp.HealthBar.Text.Visible = false end
+    else for _, obj in pairs(esp.HealthBar) do obj.Visible = false end end
+    if ESPSettings.NameESP then esp.Info.Name.Text = player.DisplayName esp.Info.Name.Position = Vector2.new(boxPosition.X + boxWidth/2, boxPosition.Y - 20) esp.Info.Name.Color = GetPlayerColor(player, "name") esp.Info.Name.Visible = true else esp.Info.Name.Visible = false end
+    local highlight = Highlights[player] if highlight and ESPSettings.ChamsEnabled and character then highlight.Parent = character highlight.FillColor = ESPSettings.ChamsFillColor highlight.OutlineColor = ESPSettings.ChamsOutlineColor highlight.FillTransparency = ESPSettings.ChamsTransparency highlight.OutlineTransparency = ESPSettings.ChamsOutlineTransparency highlight.Enabled = true elseif highlight then highlight.Enabled = false end
+    local skeleton = Drawings.Skeleton[player]
+    if ESPSettings.SkeletonESP and skeleton then
+        local head = character:FindFirstChild("Head")
+        local upperTorso = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+        local lowerTorso = character:FindFirstChild("LowerTorso") or upperTorso
+        
+        if head and upperTorso then
+            local function drawBone(from, to, line)
+                if not from or not to or not line then line.Visible = false return end
+                local fromScreen, fromVis = Camera:WorldToViewportPoint(from.Position)
+                if not fromVis or fromScreen.Z <= 0 then line.Visible = false return end
+                local toScreen, toVis = Camera:WorldToViewportPoint(to.Position)
+                if not toVis or toScreen.Z <= 0 then line.Visible = false return end
+                line.From = Vector2.new(fromScreen.X, fromScreen.Y)
+                line.To = Vector2.new(toScreen.X, toScreen.Y)
+                line.Color = ESPSettings.SkeletonColor
+                line.Visible = true
+            end
+            
+            if skeleton.Head then drawBone(head, upperTorso, skeleton.Head) end
+            if skeleton.UpperSpine then drawBone(upperTorso, lowerTorso, skeleton.UpperSpine) end
+            
+            local leftArm = character:FindFirstChild("LeftUpperArm") or character:FindFirstChild("Left Arm")
+            local rightArm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
+            local leftLeg = character:FindFirstChild("LeftUpperLeg") or character:FindFirstChild("Left Leg")
+            local rightLeg = character:FindFirstChild("RightUpperLeg") or character:FindFirstChild("Right Leg")
+            
+            if leftArm and skeleton.LeftShoulder then drawBone(upperTorso, leftArm, skeleton.LeftShoulder) elseif skeleton.LeftShoulder then skeleton.LeftShoulder.Visible = false end
+            if rightArm and skeleton.RightShoulder then drawBone(upperTorso, rightArm, skeleton.RightShoulder) elseif skeleton.RightShoulder then skeleton.RightShoulder.Visible = false end
+            if leftLeg and skeleton.LeftHip then drawBone(lowerTorso, leftLeg, skeleton.LeftHip) elseif skeleton.LeftHip then skeleton.LeftHip.Visible = false end
+            if rightLeg and skeleton.RightHip then drawBone(lowerTorso, rightLeg, skeleton.RightHip) elseif skeleton.RightHip then skeleton.RightHip.Visible = false end
+        else
+            for _, line in pairs(skeleton) do if line then line.Visible = false end end
+        end
+    elseif skeleton then
+        for _, line in pairs(skeleton) do if line then line.Visible = false end end
+    end
+end
+
+local function CleanupESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        RemoveESP(player)
+    end
+    
+    for player, _ in pairs(Drawings.ESP) do
+        RemoveESP(player)
+    end
+    
+    for player, highlight in pairs(Highlights) do
+        pcall(function() highlight:Destroy() end)
+    end
+    
+    for player, skeleton in pairs(Drawings.Skeleton) do
+        for _, line in pairs(skeleton) do
+            pcall(function() line:Remove() end)
+        end
+    end
+    
+    Drawings.ESP = {}
+    Drawings.Skeleton = {}
+    Highlights = {}
+    lastESPUpdate = {}
+end
+
+-- Cleanup function
+local function DestroyAllFunctions()
+    print("[YBA Enhanced] Начало уничтожения скрипта...")
+    ScriptDestroyed = true
+    
+    -- Stop all functions with pcall
+    pcall(function() if isFlying then StopFly() end end)
+    pcall(function() if isNoClipping then StopNoClip() end end)
+    pcall(function() if isSpeedHacking then StopSpeed() end end)
+    pcall(function() if isInfiniteJumping then StopInfiniteJump() end end)
+    pcall(function() if isJumpHacking then StopJumpHack() end end)
+    pcall(function() if isStandControlActive then StopStandControl() end end)
+    pcall(function() if isAutofarmEnabled then StopAutofarm() end end)
+    pcall(function() if isAutosellEnabled then StopAutosell() end end)
+    pcall(function() if isAutobuyEnabled then StopAutobuy() end end)
+    pcall(function() if isMoneyFarmEnabled then StopMoneyFarm() end end)
+    pcall(function() if consoleEnabled then StopConsole() end end)
+    pcall(function() if commandHandlerEnabled then StopCommandHandler() end end)
+    
+    print("[YBA Enhanced] Все функции остановлены")
+    
+    -- Cleanup ESP completely
+    pcall(function()
+        ESPSettings.Enabled = false
+        CleanupESP()
+    end)
+    
+    print("[YBA Enhanced] ESP очищен")
+    
+    -- Disconnect all global connections
+    for _, connection in pairs(globalConnections) do
+        pcall(function()
+            if typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            elseif typeof(connection) == "thread" then
+                task.cancel(connection)
+            end
+        end)
+    end
+    globalConnections = {}
+    
+    print("[YBA Enhanced] Все соединения отключены")
+    
+    -- Destroy platform
+    pcall(function()
+        DestroyFarmPlatform()
+    end)
+    
+    print("[YBA Enhanced] Платформа удалена")
+    
+    -- Destroy UI
+    pcall(function()
+        if Library and Library.Unloaded == false then
+            Library:Destroy()
+        end
+    end)
+    
+    print("[YBA Enhanced] UI уничтожен")
+    
+    -- Clear all settings to prevent restart
+    Settings.Fly = false
+    Settings.NoClip = false
+    Settings.Speed = false
+    Settings.InfiniteJump = false
+    Settings.JumpHack = false
+    Settings.StandControl = false
+    Settings.Autofarm = false
+    Settings.Autosell = false
+    Settings.Platform = false
+    
+    -- Clear global flag
+    _G.YBAEnhancedLoaded = false
+    _G.YBAEnhancedCleanup = nil
+    
+    print("[YBA Enhanced] Скрипт полностью уничтожен!")
+end
+
+-- Сохраняем функцию очистки в глобальную переменную
+_G.YBAEnhancedCleanup = DestroyAllFunctions
+-- Create GUI
+local Window = Library:CreateWindow({
+    Title = "YBA",
+    SubTitle = "Sosalkin Hub",
+    TabWidth = 200,
+    Size = UDim2.fromOffset(800, 600),
+    Acrylic = false,
+    Theme = Settings.Theme or "Darker",
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+-- Movement Tab
+local MovementTab = Window:AddTab({
+    Title = "Movement",
+    Icon = "zap"
+})
+
+MovementTab:AddToggle("Fly", {
+    Title = "Fly",
+    Description = "Fly around the map",
+    Default = Settings.Fly,
+    Callback = function(Value)
+        Settings.Fly = Value
+        saveSettings()
+        
+        if Value then
+            StartFly()
+        else
+            StopFly()
+        end
+    end
+})
+
+MovementTab:AddSlider("FlySpeed", {
+    Title = "Fly Speed",
+    Description = "Adjust fly speed",
+    Default = Settings.FlySpeed,
+    Min = 1,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        Settings.FlySpeed = Value
+        saveSettings()
+    end
+})
+
+MovementTab:AddToggle("NoClip", {
+    Title = "NoClip",
+    Description = "Walk through walls",
+    Default = Settings.NoClip,
+    Callback = function(Value)
+        Settings.NoClip = Value
+        saveSettings()
+        
+        if Value then
+            StartNoClip()
+        else
+            StopNoClip()
+        end
+    end
+})
+
+MovementTab:AddToggle("Speed", {
+    Title = "Speed Hack",
+    Description = "Increase walk speed",
+    Default = Settings.Speed,
+    Callback = function(Value)
+        Settings.Speed = Value
+        saveSettings()
+        
+        if Value then
+            StartSpeed()
+        else
+            StopSpeed()
+        end
+    end
+})
+
+MovementTab:AddSlider("SpeedValue", {
+    Title = "Speed Value",
+    Description = "Adjust walk speed",
+    Default = Settings.SpeedValue,
+    Min = 16,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        Settings.SpeedValue = Value
+        saveSettings()
+        
+        if isSpeedHacking then
+            local character = Player.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.WalkSpeed = Value
+                end
+            end
+        end
+    end
+})
+
+MovementTab:AddToggle("InfiniteJump", {
+    Title = "Infinite Jump",
+    Description = "Jump infinitely",
+    Default = Settings.InfiniteJump,
+    Callback = function(Value)
+        Settings.InfiniteJump = Value
+        saveSettings()
+        
+        if Value then
+            StartInfiniteJump()
+        else
+            StopInfiniteJump()
+        end
+    end
+})
+
+MovementTab:AddToggle("JumpHack", {
+    Title = "Jump Hack",
+    Description = "Modify jump height",
+    Default = Settings.JumpHack,
+    Callback = function(Value)
+        Settings.JumpHack = Value
+        saveSettings()
+        
+        if Value then
+            StartJumpHack()
+        else
+            StopJumpHack()
+        end
+    end
+})
+
+MovementTab:AddSlider("JumpHeight", {
+    Title = "Jump Height",
+    Description = "Adjust jump height",
+    Default = Settings.JumpHeight,
+    Min = 10,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        Settings.JumpHeight = Value
+        saveSettings()
+        
+        if isJumpHacking then
+            local character = Player.Character
+            if character then
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    humanoid.JumpPower = Value
+                end
+            end
+        end
+    end
+})
+
+-- ESP Tab
+local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
+ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() elseif Drawing then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end else Library:Notify({Title = "ESP", Content = "Drawing library not supported", Duration = 3}) end end})
+ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() end})
+ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() end})
+ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() end})
+ESPTab:AddToggle("HealthESP", {Title = "Health Bar", Default = ESPSettings.HealthESP, Callback = function(Value) ESPSettings.HealthESP = Value saveSettings() end})
+ESPTab:AddToggle("NameESP", {Title = "Name ESP", Default = ESPSettings.NameESP, Callback = function(Value) ESPSettings.NameESP = Value saveSettings() end})
+ESPTab:AddToggle("ChamsEnabled", {Title = "Chams", Default = ESPSettings.ChamsEnabled, Callback = function(Value) ESPSettings.ChamsEnabled = Value saveSettings() end})
+ESPTab:AddToggle("SkeletonESP", {Title = "Skeleton ESP", Default = ESPSettings.SkeletonESP, Callback = function(Value) ESPSettings.SkeletonESP = Value saveSettings() end})
+ESPTab:AddToggle("TeamCheck", {Title = "Team Check", Default = ESPSettings.TeamCheck, Callback = function(Value) ESPSettings.TeamCheck = Value saveSettings() end})
+ESPTab:AddSlider("MaxDistance", {Title = "Max Distance", Default = ESPSettings.MaxDistance, Min = 100, Max = 5000, Rounding = 0, Callback = function(Value) ESPSettings.MaxDistance = Value saveSettings() end})
+
+ESPTab:AddColorpicker("BoxColor", {Title = "Box Color", Default = Colors.Box, Callback = function(Value) Colors.Box = Value saveSettings() end})
+ESPTab:AddColorpicker("TracerColor", {Title = "Tracer Color", Default = Colors.Tracer, Callback = function(Value) Colors.Tracer = Value saveSettings() end})
+ESPTab:AddColorpicker("NameColor", {Title = "Name Color", Default = Colors.Name, Callback = function(Value) Colors.Name = Value saveSettings() end})
+ESPTab:AddColorpicker("ChamsFillColor", {Title = "Chams Fill Color", Default = ESPSettings.ChamsFillColor, Callback = function(Value) ESPSettings.ChamsFillColor = Value saveSettings() end})
+ESPTab:AddColorpicker("ChamsOutlineColor", {Title = "Chams Outline Color", Default = ESPSettings.ChamsOutlineColor, Callback = function(Value) ESPSettings.ChamsOutlineColor = Value saveSettings() end})
+ESPTab:AddColorpicker("SkeletonColor", {Title = "Skeleton Color", Default = ESPSettings.SkeletonColor, Callback = function(Value) ESPSettings.SkeletonColor = Value saveSettings() end})
+
+-- Autofarm Tab
+local AutoTab = Window:AddTab({Title = "Autofarm", Icon = "cpu"})
+
+-- === АВТОФАРМ ===
+AutoTab:AddToggle("Autofarm", {
+    Title = "🎯 Auto Farm Items",
+    Description = "Автоматически собирает выбранные предметы",
+    Default = Settings.Autofarm,
+    Callback = function(Value)
+        Settings.Autofarm = Value
+        saveSettings()
+        
+        if Value then
+            StartAutofarm()
+        else
+            StopAutofarm()
+        end
+    end
+})
+
+Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
+    Title = "📦 Предметы для сбора",
+    Description = "Выбери какие предметы собирать",
+    Values = farmItemsList,
+    Multi = true,
+    Default = Settings.FarmItems,
+    Callback = function(Value)
+        Settings.FarmItems = Value
+        saveSettings()
+        _G.YBAFarmItems = Value
+    end
+})
+
+AutoTab:AddToggle("Autosell", {
+    Title = "💰 Auto Sell Items",
+    Description = "Автоматически продает выбранные предметы (лимит $1M)",
+    Default = Settings.Autosell,
+    Callback = function(Value)
+        Settings.Autosell = Value
+        saveSettings()
+        
+        if Value then
+            StartAutosell()
+        else
+            StopAutosell()
+        end
+    end
+})
+
+Options.SellItems = AutoTab:AddDropdown("SellItems", {
+    Title = "💸 Предметы для продажи",
+    Description = "Выбери какие предметы продавать",
+    Values = sellItemsList,
+    Multi = true,
+    Default = Settings.SellItems,
+    Callback = function(Value)
+        Settings.SellItems = Value
+        saveSettings()
+        _G.YBASellItems = Value
+    end
+})
+
+-- === СТАТИСТИКА ===
+AutoTab:AddButton({
+    Title = "📊 Показать статистику фарма",
+    Description = "Детальная статистика собранных/проданных предметов",
+    Callback = function()
+        local uptime = math.floor(tick() - farmStats.startTime)
+        local days = math.floor(uptime / 86400)
+        local hours = math.floor((uptime % 86400) / 3600)
+        local minutes = math.floor((uptime % 3600) / 60)
+        local seconds = uptime % 60
+        
+        local uptimeStr
+        if days > 0 then
+            uptimeStr = string.format("%dд %02dч %02dм %02dс", days, hours, minutes, seconds)
+        elseif hours > 0 then
+            uptimeStr = string.format("%dч %02dм %02dс", hours, minutes, seconds)
+        else
+            uptimeStr = string.format("%dм %02dс", minutes, seconds)
+        end
+        
+        local totalItems = 0
+        local sellableItems = 0
+        local sellableValue = 0
+        local luckyArrows = 0
+        local luckyMasks = 0
+        
+        for _, item in pairs(Player.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                totalItems = totalItems + 1
+                
+                if item.Name == "Lucky Arrow" then
+                    luckyArrows = luckyArrows + 1
+                elseif item.Name == "Lucky Stone Mask" then
+                    luckyMasks = luckyMasks + 1
+                end
+                
+                local itemPrice = itemPrices[item.Name] or 0
+                if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                    sellableItems = sellableItems + 1
+                    sellableValue = sellableValue + itemPrice
+                end
+            end
+        end
+        
+        Library:Notify({
+            Title = "📊 Статистика фарма",
+            Content = "Собрано: " .. farmStats.itemsCollected .. " ($" .. farmStats.moneyCollected .. ")\nПродано: " .. farmStats.itemsSold .. " ($" .. farmStats.moneySold .. ")\nВремя: " .. uptimeStr .. "\n\nИнвентарь: " .. totalItems .. " предметов\nМожно продать: " .. sellableItems .. " ($" .. sellableValue .. ")\nLucky Arrow: " .. luckyArrows .. "\nLucky Mask: " .. luckyMasks,
+            Duration = 8
+        })
+    end
+})
+
+-- === ПОКУПКА LUCKY ARROW ===
+AutoTab:AddToggle("AutobuyLuckyArrow", {
+    Title = "🎯 Auto Buy Lucky Arrow (Loop)",
+    Description = "Автоматически покупает Lucky Arrow за $50,000 (бесконечно)",
+    Default = Settings.AutobuyLuckyArrow,
+    Callback = function(Value)
+        Settings.AutobuyLuckyArrow = Value
+        saveSettings()
+        
+        if Value then
+            StartAutobuy()
+        else
+            StopAutobuy()
+        end
+    end
+})
+
+AutoTab:AddButton({
+    Title = "🎯 Купить 1x Lucky Arrow",
+    Description = "Купить ОДНУ Lucky Arrow за $50,000 (разовая покупка)",
+    Callback = function()
+        local money = GetPlayerMoney()
+        if money < 50000 then
+            Library:Notify({
+                Title = "Autobuy",
+                Content = "Недостаточно денег! Нужно $50,000 (есть $" .. money .. ")",
+                Duration = 3
+            })
+            return
+        end
+        
+        local success = BuyLuckyArrow()
+        if success then
+            Library:Notify({
+                Title = "Autobuy",
+                Content = "Lucky Arrow куплена! Баланс: $" .. (money - 50000),
+                Duration = 3
+            })
+        else
+            Library:Notify({
+                Title = "Autobuy",
+                Content = "Ошибка покупки Lucky Arrow!",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- === ЗАЩИТА ОТ ЧИТЕРОВ ===
+AutoTab:AddToggle("AutoServerHop", {
+    Title = "🛡️ Auto Server Hop",
+    Description = "Автоматически меняет сервер при обнаружении 3 читеров",
+    Default = Settings.AutoServerHop,
+    Callback = function(Value)
+        Settings.AutoServerHop = Value
+        saveSettings()
+        
+        if Value then
+            StartCheaterDetection()
+        else
+            StopCheaterDetection()
+        end
+    end
+})
+
+AutoTab:AddSlider("CheaterDetectionSensitivity", {
+    Title = "Чувствительность детектора",
+    Description = "Сколько раз нужно засечь читера для подтверждения",
+    Default = Settings.CheaterDetectionSensitivity,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(Value)
+        Settings.CheaterDetectionSensitivity = Value
+        saveSettings()
+    end
+})
+
+AutoTab:AddButton({
+    Title = "🔄 Сменить сервер вручную",
+    Description = "Принудительно сменить сервер (с сохранением настроек)",
+    Callback = function()
+        ServerHop()
+    end
+})
+
+-- Teleport Tab
+local TeleportTab = Window:AddTab({
+    Title = "Teleport",
+    Icon = "navigation"
+})
+
+-- === МОНИТОРИНГ БАЛАНСА ===
+AutoTab:AddToggle("MoneyFarmEnabled", {
+    Title = "Мониторинг баланса",
+    Description = "Отслеживает количество денег на аккаунте",
+    Default = Settings.MoneyFarmEnabled,
+    Callback = function(Value)
+        Settings.MoneyFarmEnabled = Value
+        saveSettings()
+        
+        if Value then
+            StartMoneyFarm()
+        else
+            StopMoneyFarm()
+        end
+    end
+})
+
+AutoTab:AddToggle("AutoDropMoney", {
+    Title = "Режим продажи",
+    Description = "Включить когда нужно передать деньги покупателю",
+    Default = Settings.AutoDropMoney,
+    Callback = function(Value)
+        Settings.AutoDropMoney = Value
+        saveSettings()
+        
+        if Value then
+            Library:Notify({
+                Title = "Money Farm",
+                Content = "Режим продажи активирован! Деньги будут дропнуты вручную.",
+                Duration = 5
+            })
+        end
+    end
+})
+
+AutoTab:AddInput("ReceiverUsername", {
+    Title = "Ник получателя",
+    Description = "Username игрока который будет получать деньги",
+    Default = Settings.ReceiverUsername,
+    Placeholder = "Введите ник...",
+    Callback = function(Value)
+        Settings.ReceiverUsername = Value
+        saveSettings()
+    end
+})
+
+AutoTab:AddButton({
+    Title = "Дропнуть все деньги",
+    Description = "Вручную дропнуть все деньги на землю",
+    Callback = function()
+        local money = GetPlayerMoney()
+        if money > 0 then
+            local success = DropMoney(money)
+            if success then
+                Library:Notify({
+                    Title = "Money Farm",
+                    Content = "Дропнуто $" .. money,
+                    Duration = 3
+                })
+            else
+                Library:Notify({
+                    Title = "Money Farm",
+                    Content = "Ошибка дропа денег!",
+                    Duration = 3
+                })
+            end
+        else
+            Library:Notify({
+                Title = "Money Farm",
+                Content = "Нет денег для дропа",
+                Duration = 3
+            })
+        end
+    end
+})
+
+AutoTab:AddButton({
+    Title = "Тест: Отправить уведомление",
+    Description = "Проверяет связь с локальным сервером (localhost:5000)",
+    Callback = function()
+        local money = GetPlayerMoney()
+        local success = SendMoneyNotification(money, Settings.ReceiverUsername)
+        
+        if success then
+            Library:Notify({
+                Title = "Money Farm",
+                Content = "Уведомление отправлено успешно!",
+                Duration = 3
+            })
+        else
+            Library:Notify({
+                Title = "Money Farm",
+                Content = "Ошибка отправки! Проверьте что сервер запущен.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+AutoTab:AddButton({
+    Title = "Показать текущий баланс",
+    Description = "Выводит количество денег в консоль и уведомление",
+    Callback = function()
+        local money = GetPlayerMoney()
+        currentMoney = money
+        
+        Library:Notify({
+            Title = "Money Farm",
+            Content = "💰 Баланс: $" .. money,
+            Duration = 3
+        })
+        
+        print("[Money Farm] Текущий баланс: $" .. money)
+    end
+})
+
+local PlayerDropdown = TeleportTab:AddDropdown("PlayerSelect", {
+    Title = "Select Player",
+    Description = "Choose player to teleport to",
+    Values = GetAlivePlayers(),
+    Multi = false,
+    Default = Settings.SelectedPlayer,
+    Callback = function(Value)
+        Settings.SelectedPlayer = Value
+        saveSettings()
+    end
+})
+
+TeleportTab:AddButton({
+    Title = "Teleport to Player",
+    Description = "Teleport to selected player",
+    Callback = function()
+        if Settings.SelectedPlayer then
+            if TeleportToPlayer(Settings.SelectedPlayer) then
+                Library:Notify({
+                    Title = "Teleport",
+                    Content = "Teleported to " .. Settings.SelectedPlayer,
+                    Duration = 3
+                })
+            else
+                Library:Notify({
+                    Title = "Teleport",
+                    Content = "Failed to teleport",
+                    Duration = 3
+                })
+            end
+        else
+            Library:Notify({
+                Title = "Teleport",
+                Content = "No player selected",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Console variables
+local consoleEnabled = false
+local consoleGui = nil
+local consoleFrame = nil
+local consoleOutput = nil
+local consoleInput = nil
+local consoleConnections = {}
+
+-- Console Functions
+local function CreateConsole()
+    if consoleGui then return end
+    
+    consoleGui = Instance.new("ScreenGui")
+    consoleGui.Name = "CustomConsole"
+    consoleGui.Parent = CoreGui
+    
+    consoleFrame = Instance.new("Frame")
+    consoleFrame.Size = UDim2.new(0, 600, 0, 400)
+    consoleFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+    consoleFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+    consoleFrame.BorderSizePixel = 2
+    consoleFrame.BorderColor3 = Color3.new(1, 1, 1)
+    consoleFrame.Active = true
+    consoleFrame.Draggable = true
+    consoleFrame.Parent = consoleGui
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    title.Text = "SOSALKIN CONSOLE"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.TextSize = 16
+    title.Font = Enum.Font.GothamBold
+    title.Parent = consoleFrame
+    
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -30, 0, 0)
+    closeBtn.BackgroundColor3 = Color3.new(0.8, 0, 0)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.TextSize = 14
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = consoleFrame
+    
+
+    
+    consoleOutput = Instance.new("ScrollingFrame")
+    consoleOutput.Size = UDim2.new(1, -10, 1, -70)
+    consoleOutput.Position = UDim2.new(0, 5, 0, 35)
+    consoleOutput.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
+    consoleOutput.BorderSizePixel = 1
+    consoleOutput.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
+    consoleOutput.ScrollBarThickness = 8
+    consoleOutput.SelectionImageObject = nil
+    consoleOutput.Parent = consoleFrame
+    
+    local outputList = Instance.new("UIListLayout")
+    outputList.SortOrder = Enum.SortOrder.LayoutOrder
+    outputList.Parent = consoleOutput
+    
+    consoleInput = Instance.new("TextBox")
+    consoleInput.Size = UDim2.new(1, -10, 0, 25)
+    consoleInput.Position = UDim2.new(0, 5, 1, -30)
+    consoleInput.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    consoleInput.BorderSizePixel = 1
+    consoleInput.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
+    consoleInput.Text = ""
+    consoleInput.PlaceholderText = "Enter command..."
+    consoleInput.TextColor3 = Color3.new(1, 1, 1)
+    consoleInput.TextSize = 14
+    consoleInput.Font = Enum.Font.Gotham
+    consoleInput.TextXAlignment = Enum.TextXAlignment.Left
+    consoleInput.Parent = consoleFrame
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        consoleEnabled = false
+        if consoleGui then
+            consoleGui:Destroy()
+            consoleGui = nil
+        end
+    end)
+    
+    consoleInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed and consoleInput.Text ~= "" then
+            pcall(function()
+                ExecuteCommand(consoleInput.Text)
+            end)
+            consoleInput.Text = ""
+        end
+    end)
+end
+
+local function DestroyConsole()
+    pcall(function()
+        if consoleGui then
+            consoleGui:Destroy()
+            consoleGui = nil
+            consoleFrame = nil
+            consoleOutput = nil
+            consoleInput = nil
+        end
+    end)
+    
+    for _, connection in pairs(consoleConnections) do
+        pcall(function()
+            if connection and typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            end
+        end)
+    end
+    consoleConnections = {}
+end
+
+local function AddConsoleLog(text, color)
+    if not consoleOutput then return end
+    
+    local logLabel = Instance.new("TextLabel")
+    logLabel.Size = UDim2.new(1, -10, 0, 20)
+    logLabel.BackgroundTransparency = 1
+    logLabel.Text = "[" .. os.date("%H:%M:%S") .. "] " .. text
+    logLabel.TextColor3 = color or Color3.new(1, 1, 1)
+    logLabel.TextSize = 12
+    logLabel.Font = Enum.Font.Gotham
+    logLabel.TextXAlignment = Enum.TextXAlignment.Left
+    logLabel.TextWrapped = true
+    logLabel.Parent = consoleOutput
+    
+    local layout = consoleOutput:FindFirstChild("UIListLayout")
+    if layout then
+        consoleOutput.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.CanvasSize.Y.Offset)
+    end
+end
+
+local function ExecuteCommand(command)
+    AddConsoleLog("> " .. command, Color3.new(0, 1, 0))
+    
+    local args = command:split(" ")
+    local cmd = args[1]:lower()
+    
+    if cmd == "help" then
+        AddConsoleLog("Available commands:", Color3.new(1, 1, 0))
+        AddConsoleLog("help - Show this help", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("clear - Clear console", Color3.new(0.8, 0.8, 0.8))
+
+        AddConsoleLog("tp [x] [y] [z] - Teleport to coordinates", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("speed [value] - Set walk speed", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("fly [on/off] - Toggle fly", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("noclip [on/off] - Toggle noclip", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("testdialogue [option] [dialogue] - Test Merchant dialogue", Color3.new(0.8, 0.8, 0.8))
+        AddConsoleLog("lua [code] - Execute Lua code", Color3.new(0.8, 0.8, 0.8))
+    elseif cmd == "clear" then
+        for _, child in pairs(consoleOutput:GetChildren()) do
+            if child:IsA("TextLabel") then
+                child:Destroy()
+            end
+        end
+
+    elseif cmd == "tp" and #args >= 4 then
+        local x, y, z = tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
+        if x and y and z then
+            local character = Player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = CFrame.new(x, y, z)
+                AddConsoleLog("Teleported to " .. x .. ", " .. y .. ", " .. z, Color3.new(0, 1, 1))
+            end
+        else
+            AddConsoleLog("Invalid coordinates", Color3.new(1, 0, 0))
+        end
+    elseif cmd == "speed" and #args >= 2 then
+        local speed = tonumber(args[2])
+        if speed then
+            local character = Player.Character
+            if character and character:FindFirstChild("Humanoid") then
+                character.Humanoid.WalkSpeed = speed
+                AddConsoleLog("Speed set to " .. speed, Color3.new(0, 1, 1))
+            end
+        else
+            AddConsoleLog("Invalid speed value", Color3.new(1, 0, 0))
+        end
+    elseif cmd == "fly" and #args >= 2 then
+        local state = args[2]:lower()
+        if state == "on" then
+            StartFly()
+            AddConsoleLog("Fly enabled", Color3.new(0, 1, 1))
+        elseif state == "off" then
+            StopFly()
+            AddConsoleLog("Fly disabled", Color3.new(0, 1, 1))
+        end
+    elseif cmd == "noclip" and #args >= 2 then
+        local state = args[2]:lower()
+        if state == "on" then
+            StartNoClip()
+            AddConsoleLog("NoClip enabled", Color3.new(0, 1, 1))
+        elseif state == "off" then
+            StopNoClip()
+            AddConsoleLog("NoClip disabled", Color3.new(0, 1, 1))
+        end
+    elseif cmd == "testdialogue" and #args >= 3 then
+        local option = args[2]
+        local dialogue = args[3]
+        local character = Player.Character
+        if character and character:FindFirstChild("RemoteEvent") then
+            local args = {
+                [1] = "EndDialogue",
+                [2] = {
+                    ["NPC"] = "Merchant",
+                    ["Option"] = option,
+                    ["Dialogue"] = dialogue
+                }
+            }
+            character.RemoteEvent:FireServer(unpack(args))
+            AddConsoleLog("Sent: Option=" .. option .. ", Dialogue=" .. dialogue, Color3.new(0, 1, 1))
+        else
+            AddConsoleLog("Character or RemoteEvent not found", Color3.new(1, 0, 0))
+        end
+    elseif cmd == "lua" and #args >= 2 then
+        local code = command:sub(5)
+        local success, result = pcall(function()
+            return loadstring(code)()
+        end)
+        if success then
+            AddConsoleLog("Executed: " .. tostring(result), Color3.new(0, 1, 1))
+        else
+            AddConsoleLog("Error: " .. tostring(result), Color3.new(1, 0, 0))
+        end
+    else
+        AddConsoleLog("Unknown command. Type 'help' for available commands.", Color3.new(1, 0, 0))
+    end
+end
+
+local function StartConsole()
+    if consoleEnabled then return end
+    consoleEnabled = true
+    
+    pcall(function()
+        CreateConsole()
+    end)
+    
+    -- Hook into game logs
+    pcall(function()
+        consoleConnections.logService = game:GetService("LogService").MessageOut:Connect(function(message, messageType)
+            if not consoleEnabled then return end
+            
+            local color = Color3.new(1, 1, 1)
+            if messageType == Enum.MessageType.MessageError then
+                color = Color3.new(1, 0, 0)
+            elseif messageType == Enum.MessageType.MessageWarning then
+                color = Color3.new(1, 1, 0)
+            elseif messageType == Enum.MessageType.MessageInfo then
+                color = Color3.new(0, 1, 1)
+            end
+            
+            AddConsoleLog(message, color)
+        end)
+    end)
+    
+    -- Hook into script errors
+    pcall(function()
+        consoleConnections.scriptContext = game:GetService("ScriptContext").Error:Connect(function(message, stack, script)
+            if not consoleEnabled then return end
+            AddConsoleLog("SCRIPT ERROR: " .. message, Color3.new(1, 0, 0))
+            if stack and stack ~= "" then
+                AddConsoleLog("Stack: " .. stack, Color3.new(0.8, 0.4, 0.4))
+            end
+        end)
+    end)
+    
+    pcall(function()
+        AddConsoleLog("Custom console initialized", Color3.new(0, 1, 0))
+    end)
+end
+
+local function StopConsole()
+    if not consoleEnabled then return end
+    consoleEnabled = false
+    
+    pcall(function()
+        DestroyConsole()
+    end)
+end
+
+-- Settings Tab
+local SettingsTab = Window:AddTab({
+    Title = "Settings",
+    Icon = "settings"
+})
+
+-- Test Tab
+local DebugTab = Window:AddTab({
+    Title = "Test",
+    Icon = "bug"
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Найти ближайший предмет",
+    Description = "Проверяет поиск ближайшего предмета",
+    Callback = function()
+        local prompt, item = FindNearestItem()
+        if prompt and item then
+            local itemName = prompt.ObjectText or "Unknown"
+            local distance = (item.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            Library:Notify({
+                Title = "Тест: Предмет найден",
+                Content = itemName .. " на расстоянии " .. math.floor(distance) .. " стадов",
+                Duration = 5
+            })
+            print("[DEBUG] Найден предмет: " .. itemName)
+            print("[DEBUG] Позиция: " .. tostring(item.Position))
+            print("[DEBUG] Расстояние: " .. distance)
+        else
+            Library:Notify({
+                Title = "Тест: Предмет не найден",
+                Content = "Нет предметов для фарма поблизости",
+                Duration = 3
+            })
+            print("[DEBUG] Предметы не найдены")
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Телепорт к предмету",
+    Description = "Телепортируется к ближайшему предмету",
+    Callback = function()
+        local prompt, item = FindNearestItem()
+        if prompt and item then
+            local itemName = prompt.ObjectText or "Unknown"
+            local targetPos = item.Position + Vector3.new(0, -8, 0)
+            local startTime = tick()
+            
+            Library:Notify({
+                Title = "Тест: Телепорт",
+                Content = "Телепортация к " .. itemName .. "...",
+                Duration = 3
+            })
+            
+            bypassTeleport(targetPos)
+            
+            local elapsed = tick() - startTime
+            Library:Notify({
+                Title = "Тест: Телепорт завершен",
+                Content = "Время: " .. string.format("%.2f", elapsed) .. "с",
+                Duration = 3
+            })
+            print("[DEBUG] Телепорт завершен за " .. elapsed .. " секунд")
+        else
+            Library:Notify({
+                Title = "Тест: Ошибка",
+                Content = "Нет предметов для телепорта",
+                Duration = 3
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Активация промпта",
+    Description = "Пытается подобрать ближайший предмет",
+    Callback = function()
+        local prompt, item = FindNearestItem()
+        if prompt and item then
+            local itemName = prompt.ObjectText or "Unknown"
+            local targetPos = item.Position + Vector3.new(0, -8, 0)
+            local character = Player.Character
+            local rootPart = character.HumanoidRootPart
+            
+            Library:Notify({
+                Title = "Тест: Подбор предмета",
+                Content = "Попытка подобрать " .. itemName .. "...",
+                Duration = 3
+            })
+            
+            -- Телепортируемся к предмету
+            bypassTeleport(targetPos)
+            
+            -- Настройка промпта
+            prompt.MaxActivationDistance = 100
+            prompt.RequiresLineOfSight = false
+            prompt.HoldDuration = 0
+            prompt.Enabled = true
+            prompt.ClickablePrompt = false
+            prompt.Style = Enum.ProximityPromptStyle.Default
+            prompt.UIOffset = Vector2.new(0, 0)
+            
+            -- Создаем платформу
+            local tempPlatform = Instance.new("Part")
+            tempPlatform.Name = "TempPickupPlatform"
+            tempPlatform.Size = Vector3.new(10, 1, 10)
+            tempPlatform.Position = targetPos - Vector3.new(0, 3, 0)
+            tempPlatform.Anchored = true
+            tempPlatform.CanCollide = true
+            tempPlatform.Transparency = 1
+            tempPlatform.Parent = workspace
+            
+            task.wait(0.05)
+            
+            -- Стабилизируем позицию
+            rootPart.CFrame = CFrame.new(targetPos)
+            rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            
+            -- Принудительно показываем промпт
+            pcall(function()
+                prompt.Parent = item
+                prompt.Enabled = true
+                task.wait(0.01)
+            end)
+            
+            local attempts = 0
+            local success = false
+            
+            -- Пытаемся активировать
+            for i = 1, 15 do
+                if not item:IsDescendantOf(workspace) then
+                    success = true
+                    break
+                end
+                
+                attempts = attempts + 1
+                
+                rootPart.CFrame = CFrame.new(targetPos)
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                
+                pcall(function()
+                    prompt:InputHoldBegin()
+                    prompt:InputHoldEnd()
+                end)
+                task.wait(0.01)
+                
+                pcall(function()
+                    fireproximityprompt(prompt, 0, true)
+                end)
+                task.wait(0.01)
+                
+                pcall(function()
+                    fireproximityprompt(prompt)
+                end)
+                task.wait(0.01)
+            end
+            
+            pcall(function()
+                tempPlatform:Destroy()
+            end)
+            
+            if success then
+                Library:Notify({
+                    Title = "Тест: Успех!",
+                    Content = itemName .. " подобран за " .. attempts .. " попыток",
+                    Duration = 5
+                })
+                print("[DEBUG] Предмет подобран успешно за " .. attempts .. " попыток")
+            else
+                Library:Notify({
+                    Title = "Тест: Неудача",
+                    Content = "Не удалось подобрать " .. itemName .. " за 15 попыток",
+                    Duration = 5
+                })
+                print("[DEBUG] Не удалось подобрать предмет")
+            end
+        else
+            Library:Notify({
+                Title = "Тест: Ошибка",
+                Content = "Нет предметов для подбора",
+                Duration = 3
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Телепорт на платформу",
+    Description = "Проверяет телепорт на фарм платформу",
+    Callback = function()
+        local startTime = tick()
+        TeleportToPlatform()
+        local elapsed = tick() - startTime
+        
+        Library:Notify({
+            Title = "Тест: Платформа",
+            Content = "Телепорт завершен за " .. string.format("%.2f", elapsed) .. "с",
+            Duration = 3
+        })
+        print("[DEBUG] Телепорт на платформу за " .. elapsed .. " секунд")
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Проверка застревания",
+    Description = "Проверяет систему обнаружения застревания",
+    Callback = function()
+        local stuck = isPlayerStuck()
+        Library:Notify({
+            Title = "Тест: Застревание",
+            Content = stuck and "Игрок застрял!" or "Игрок не застрял",
+            Duration = 3
+        })
+        print("[DEBUG] Застревание: " .. tostring(stuck))
+        print("[DEBUG] Счетчик застреваний: " .. stuckCounter)
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Показать выбранные предметы",
+    Description = "Выводит список выбранных предметов для фарма",
+    Callback = function()
+        local selectedItems = Options.FarmItems and Options.FarmItems.Value or Settings.FarmItems
+        
+        if type(selectedItems) == "table" then
+            local itemList = {}
+            for item, isSelected in pairs(selectedItems) do
+                if isSelected then
+                    table.insert(itemList, item)
+                end
+            end
+            
+            if #itemList > 0 then
+                Library:Notify({
+                    Title = "Выбранные предметы",
+                    Content = table.concat(itemList, ", "),
+                    Duration = 5
+                })
+                print("[DEBUG] Выбранные предметы для фарма:")
+                for _, item in ipairs(itemList) do
+                    print("  - " .. item)
+                end
+            else
+                Library:Notify({
+                    Title = "Нет выбранных предметов",
+                    Content = "Выберите предметы в Automation",
+                    Duration = 3
+                })
+            end
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Показать статистику фарма",
+    Description = "Показывает актуальную статистику собранных/проданных предметов",
+    Callback = function()
+        local uptime = math.floor(tick() - farmStats.startTime)
+        local days = math.floor(uptime / 86400)
+        local hours = math.floor((uptime % 86400) / 3600)
+        local minutes = math.floor((uptime % 3600) / 60)
+        local seconds = uptime % 60
+        
+        local uptimeStr
+        if days > 0 then
+            uptimeStr = string.format("%dд %02dч %02dм %02dс", days, hours, minutes, seconds)
+        elseif hours > 0 then
+            uptimeStr = string.format("%dч %02dм %02dс", hours, minutes, seconds)
+        else
+            uptimeStr = string.format("%dм %02dс", minutes, seconds)
+        end
+        
+        -- НОВОЕ: Подсчет предметов в инвентаре
+        local totalItems = 0
+        local sellableItems = 0
+        local sellableValue = 0
+        local luckyArrows = 0
+        local luckyMasks = 0
+        local inventoryList = {}
+        
+        for _, item in pairs(Player.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                totalItems = totalItems + 1
+                
+                -- Считаем Lucky Arrow и Lucky Stone Mask
+                if item.Name == "Lucky Arrow" then
+                    luckyArrows = luckyArrows + 1
+                elseif item.Name == "Lucky Stone Mask" then
+                    luckyMasks = luckyMasks + 1
+                end
+                
+                -- Считаем продаваемые предметы
+                local itemPrice = itemPrices[item.Name] or 0
+                if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                    sellableItems = sellableItems + 1
+                    sellableValue = sellableValue + itemPrice
+                end
+                
+                -- Добавляем в список
+                if inventoryList[item.Name] then
+                    inventoryList[item.Name] = inventoryList[item.Name] + 1
+                else
+                    inventoryList[item.Name] = 1
+                end
+            end
+        end
+        
+        Library:Notify({
+            Title = "Статистика фарма",
+            Content = "Собрано: " .. farmStats.itemsCollected .. " ($" .. farmStats.moneyCollected .. ")\nПродано: " .. farmStats.itemsSold .. " ($" .. farmStats.moneySold .. ")\nВремя: " .. uptimeStr .. "\n\nИнвентарь: " .. totalItems .. " предметов\nМожно продать: " .. sellableItems .. " ($" .. sellableValue .. ")\nLucky Arrow: " .. luckyArrows .. "\nLucky Mask: " .. luckyMasks,
+            Duration = 8
+        })
+        
+        print("[DEBUG] === Статистика фарма ===")
+        print("[DEBUG] Предметов собрано: " .. farmStats.itemsCollected .. " на сумму $" .. farmStats.moneyCollected)
+        print("[DEBUG] Предметов продано: " .. farmStats.itemsSold .. " на сумму $" .. farmStats.moneySold)
+        print("[DEBUG] Время работы: " .. uptimeStr)
+        print("[DEBUG] Автофарм: " .. (isAutofarmEnabled and "Активен" or "Неактивен"))
+        print("[DEBUG] Автопродажа: " .. (isAutosellEnabled and "Активна" or "Неактивна"))
+        print("[DEBUG] ")
+        print("[DEBUG] === Инвентарь ===")
+        print("[DEBUG] Всего предметов: " .. totalItems)
+        print("[DEBUG] Можно продать: " .. sellableItems .. " предметов на $" .. sellableValue)
+        print("[DEBUG] Lucky Arrow: " .. luckyArrows)
+        print("[DEBUG] Lucky Stone Mask: " .. luckyMasks)
+        print("[DEBUG] ")
+        print("[DEBUG] Список предметов:")
+        for itemName, count in pairs(inventoryList) do
+            local price = itemPrices[itemName] or 0
+            print("[DEBUG]   - " .. itemName .. " x" .. count .. " ($" .. (price * count) .. ")")
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Скорость телепорта",
+    Description = "Измеряет скорость телепорта на 1000 стадов",
+    Callback = function()
+        local character = Player.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        
+        local startPos = character.HumanoidRootPart.Position
+        local targetPos = startPos + Vector3.new(1000, 0, 0)
+        
+        Library:Notify({
+            Title = "Тест: Скорость",
+            Content = "Телепорт на 1000 стадов...",
+            Duration = 2
+        })
+        
+        local startTime = tick()
+        bypassTeleport(targetPos)
+        local elapsed = tick() - startTime
+        
+        local mode = Settings.SafeMode and "Safe Mode" or "Fast Mode"
+        Library:Notify({
+            Title = "Тест: Результат",
+            Content = mode .. ": " .. string.format("%.3f", elapsed) .. "с на 1000 стадов",
+            Duration = 5
+        })
+        print("[DEBUG] Скорость телепорта (" .. mode .. "): " .. elapsed .. " секунд")
+        print("[DEBUG] Скорость: " .. (1000/elapsed) .. " стадов/сек")
+        
+        -- Возвращаемся обратно
+        task.wait(1)
+        bypassTeleport(startPos)
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Обнаружение читеров",
+    Description = "Показывает текущий статус детектора читеров",
+    Callback = function()
+        local status = cheaterDetectionEnabled and "Активен" or "Неактивен"
+        local cheaterCount = 0
+        for _, count in pairs(cheaterDetections) do
+            cheaterCount = cheaterCount + 1
+        end
+        
+        Library:Notify({
+            Title = "Детектор читеров",
+            Content = "Статус: " .. status .. "\nОбнаружено: " .. detectedCheatersCount .. "/3\nПодозрительных: " .. cheaterCount,
+            Duration = 5
+        })
+        print("[DEBUG] Детектор читеров: " .. status)
+        print("[DEBUG] Обнаружено читеров: " .. detectedCheatersCount .. "/3")
+        print("[DEBUG] Подозрительных игроков: " .. cheaterCount)
+        print("[DEBUG] Чувствительность: " .. Settings.CheaterDetectionSensitivity)
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Мониторинг игроков",
+    Description = "Показывает скорость движения всех игроков",
+    Callback = function()
+        Library:Notify({
+            Title = "Мониторинг",
+            Content = "Сбор данных о скорости игроков...",
+            Duration = 2
+        })
+        
+        print("[DEBUG] === Мониторинг скорости игроков ===")
+        
+        task.spawn(function()
+            local tempPositions = {}
+            
+            -- Записываем начальные позиции
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    tempPositions[player.UserId] = {
+                        Position = player.Character.HumanoidRootPart.Position,
+                        Time = tick(),
+                        Name = player.Name
+                    }
+                end
+            end
+            
+            task.wait(1)
+            
+            -- Измеряем скорость
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local currentPos = player.Character.HumanoidRootPart.Position
+                    local data = tempPositions[player.UserId]
+                    
+                    if data then
+                        local distance = (currentPos - data.Position).Magnitude
+                        local timeDiff = tick() - data.Time
+                        local speed = distance / timeDiff
+                        
+                        local status = speed > 400 and "[ЧИТЕР]" or "[OK]"
+                        print("[DEBUG] " .. status .. " " .. player.Name .. ": " .. math.floor(speed) .. " стадов/сек")
+                    end
+                end
+            end
+            
+            print("[DEBUG] === Мониторинг завершен ===")
+            Library:Notify({
+                Title = "Мониторинг",
+                Content = "Данные выведены в консоль",
+                Duration = 3
+            })
+        end)
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Принудительный свап",
+    Description = "Тестирует функцию смены сервера БЕЗ сохранения",
+    Callback = function()
+        Library:Notify({
+            Title = "Тест: Свап",
+            Content = "ВНИМАНИЕ: Это тест БЕЗ сохранения настроек!",
+            Duration = 3
+        })
+        
+        print("[DEBUG] Тестовый свап сервера (без сохранения)")
+        
+        task.wait(2)
+        
+        local TeleportService = game:GetService("TeleportService")
+        local HttpService = game:GetService("HttpService")
+        
+        local success, result = pcall(function()
+            local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+            
+            if servers and servers.data then
+                local currentServerId = game.JobId
+                local availableServers = {}
+                
+                for _, server in pairs(servers.data) do
+                    if server.id ~= currentServerId and server.playing < server.maxPlayers then
+                        table.insert(availableServers, server.id)
+                    end
+                end
+                
+                print("[DEBUG] Найдено серверов: " .. #availableServers)
+                
+                if #availableServers > 0 then
+                    local randomServer = availableServers[math.random(1, #availableServers)]
+                    print("[DEBUG] Телепорт на сервер: " .. randomServer)
+                    
+                    Library:Notify({
+                        Title = "Тест: Свап",
+                        Content = "Найдено " .. #availableServers .. " серверов. Телепорт...",
+                        Duration = 3
+                    })
+                    
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player)
+                else
+                    Library:Notify({
+                        Title = "Тест: Ошибка",
+                        Content = "Нет доступных серверов",
+                        Duration = 3
+                    })
+                end
+            end
+        end)
+        
+        if not success then
+            print("[DEBUG] Ошибка свапа: " .. tostring(result))
+            Library:Notify({
+                Title = "Тест: Ошибка",
+                Content = "Не удалось получить список серверов",
+                Duration = 3
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Сброс счетчика читеров",
+    Description = "Сбрасывает счетчик обнаруженных читеров",
+    Callback = function()
+        detectedCheatersCount = 0
+        cheaterDetections = {}
+        playerPositions = {}
+        
+        Library:Notify({
+            Title = "Тест: Сброс",
+            Content = "Счетчик читеров сброшен",
+            Duration = 3
+        })
+        print("[DEBUG] Счетчик читеров сброшен")
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Нажатие кнопки Play",
+    Description = "Проверяет автоматическое нажатие кнопки загрузки",
+    Callback = function()
+        Library:Notify({
+            Title = "Тест: Loading Screen",
+            Content = "Поиск кнопки Play...",
+            Duration = 2
+        })
+        
+        print("[DEBUG] === Тест нажатия кнопки Play ===")
+        
+        task.spawn(function()
+            local maxAttempts = 10
+            local attempts = 0
+            local found = false
+            
+            while attempts < maxAttempts do
+                attempts = attempts + 1
+                print("[DEBUG] Попытка " .. attempts .. "/" .. maxAttempts)
+                
+                local success = pcall(function()
+                    local player = game:GetService("Players").LocalPlayer
+                    local playerGui = player:WaitForChild("PlayerGui", 2)
+                    
+                    if playerGui then
+                        print("[DEBUG] PlayerGui найден")
+                        local loadingScreen = playerGui:FindFirstChild("LoadingScreen")
+                        
+                        if loadingScreen then
+                            print("[DEBUG] LoadingScreen найден!")
+                            print("[DEBUG] Путь: game.Players.LocalPlayer.PlayerGui.LoadingScreen")
+                            
+                            local frames = loadingScreen:FindFirstChild("Frames")
+                            if frames then
+                                print("[DEBUG] Frames найден!")
+                                print("[DEBUG] Путь: ...LoadingScreen.Frames")
+                                
+                                local main = frames:FindFirstChild("Main")
+                                if main then
+                                    print("[DEBUG] Main найден!")
+                                    print("[DEBUG] Путь: ...Frames.Main")
+                                    
+                                    local playButton = main:FindFirstChild("Play")
+                                    if playButton then
+                                        print("[DEBUG] Кнопка Play найдена!")
+                                        print("[DEBUG] Полный путь: game.Players.LocalPlayer.PlayerGui.LoadingScreen.Frames.Main.Play")
+                                        print("[DEBUG] Тип: " .. playButton.ClassName)
+                                        print("[DEBUG] Visible: " .. tostring(playButton.Visible))
+                                        
+                                        if playButton:IsA("GuiObject") then
+                                            print("[DEBUG] Active: " .. tostring(playButton.Active))
+                                        end
+                                        
+                                        -- Нажимаем кнопку несколько раз разными методами
+                                        print("[DEBUG] Попытка нажатия кнопки...")
+                                        for i = 1, 5 do
+                                            pcall(function()
+                                                if playButton:IsA("GuiButton") or playButton:IsA("TextButton") or playButton:IsA("ImageButton") then
+                                                    firesignal(playButton.MouseButton1Click)
+                                                    firesignal(playButton.MouseButton1Down)
+                                                    firesignal(playButton.MouseButton1Up)
+                                                    firesignal(playButton.Activated)
+                                                    print("[DEBUG] Нажатие " .. i .. "/5 (все сигналы)")
+                                                else
+                                                    print("[DEBUG] Кнопка не является GuiButton, пробуем другие методы...")
+                                                    firesignal(playButton.MouseButton1Click)
+                                                    print("[DEBUG] Нажатие " .. i .. "/5 (MouseButton1Click)")
+                                                end
+                                            end)
+                                            task.wait(0.1)
+                                        end
+                                        
+                                        Library:Notify({
+                                            Title = "Тест: Успех",
+                                            Content = "Кнопка Play нажата 5 раз (тип: " .. playButton.ClassName .. ")",
+                                            Duration = 5
+                                        })
+                                        
+                                        found = true
+                                        return
+                                    else
+                                        print("[DEBUG] Кнопка Play не найдена в Main")
+                                        print("[DEBUG] Содержимое Main:")
+                                        for _, child in pairs(main:GetChildren()) do
+                                            print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
+                                        end
+                                    end
+                                else
+                                    print("[DEBUG] Main не найден в Frames")
+                                    print("[DEBUG] Содержимое Frames:")
+                                    for _, child in pairs(frames:GetChildren()) do
+                                        print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
+                                    end
+                                end
+                            else
+                                print("[DEBUG] Frames не найден в LoadingScreen")
+                                print("[DEBUG] Содержимое LoadingScreen:")
+                                for _, child in pairs(loadingScreen:GetChildren()) do
+                                    print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
+                                end
+                            end
+                            
+                            -- Альтернативный метод: удаляем экран
+                            if not found then
+                                print("[DEBUG] Попытка удалить LoadingScreen принудительно")
+                                pcall(function()
+                                    loadingScreen:Destroy()
+                                    print("[DEBUG] LoadingScreen удален!")
+                                    Library:Notify({
+                                        Title = "Тест: Альтернатива",
+                                        Content = "LoadingScreen удален принудительно",
+                                        Duration = 3
+                                    })
+                                end)
+                                found = true
+                            end
+                            return
+                        else
+                            print("[DEBUG] LoadingScreen не найден (возможно уже убран)")
+                        end
+                    else
+                        print("[DEBUG] PlayerGui не найден")
+                    end
+                end)
+                
+                if found then break end
+                task.wait(0.5)
+            end
+            
+            if not found then
+                print("[DEBUG] === Тест завершен: LoadingScreen не найден ===")
+                Library:Notify({
+                    Title = "Тест: Не найдено",
+                    Content = "LoadingScreen отсутствует (уже убран или не появился)",
+                    Duration = 3
+                })
+            else
+                print("[DEBUG] === Тест завершен успешно ===")
+            end
+        end)
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Статус обработчика команд",
+    Description = "Проверяет запущен ли обработчик команд",
+    Callback = function()
+        local status = commandHandlerEnabled and "✅ ЗАПУЩЕН" or "❌ ОСТАНОВЛЕН"
+        
+        Library:Notify({
+            Title = "Обработчик команд",
+            Content = status,
+            Duration = 3
+        })
+        
+        print("[DEBUG] Обработчик команд: " .. status)
+        print("[DEBUG] Автофарм: " .. (isAutofarmEnabled and "Активен" or "Неактивен"))
+        print("[DEBUG] Автопродажа: " .. (isAutosellEnabled and "Активна" or "Неактивна"))
+        print("[DEBUG] Собрано предметов: " .. farmStats.itemsCollected)
+        print("[DEBUG] Продано предметов: " .. farmStats.itemsSold)
+        
+        if not commandHandlerEnabled then
+            Library:Notify({
+                Title = "ВНИМАНИЕ!",
+                Content = "Обработчик команд НЕ запущен! Нажми 'Запустить обработчик'",
+                Duration = 5
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Запустить обработчик команд",
+    Description = "Принудительно запускает обработчик команд",
+    Callback = function()
+        if commandHandlerEnabled then
+            Library:Notify({
+                Title = "Обработчик команд",
+                Content = "Уже запущен!",
+                Duration = 3
+            })
+        else
+            StartCommandHandler()
+            Library:Notify({
+                Title = "Обработчик команд",
+                Content = "Запущен успешно!",
+                Duration = 3
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Отправить статистику СЕЙЧАС",
+    Description = "Принудительно отправляет статистику на сервер",
+    Callback = function()
+        local success, err = pcall(function()
+            local money = GetPlayerMoney()
+            local uptime = math.floor(tick() - farmStats.startTime)
+            
+            local totalItems = 0
+            local sellableItems = 0
+            local sellableValue = 0
+            local luckyArrows = 0
+            local luckyMasks = 0
+            
+            for _, item in pairs(Player.Backpack:GetChildren()) do
+                if item:IsA("Tool") then
+                    totalItems = totalItems + 1
+                    
+                    if item.Name == "Lucky Arrow" then
+                        luckyArrows = luckyArrows + 1
+                    elseif item.Name == "Lucky Stone Mask" then
+                        luckyMasks = luckyMasks + 1
+                    end
+                    
+                    local itemPrice = itemPrices[item.Name] or 0
+                    if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                        sellableItems = sellableItems + 1
+                        sellableValue = sellableValue + itemPrice
+                    end
+                end
+            end
+            
+            local statsData = {
+                balance = money,
+                uptime = uptime,
+                items_collected = farmStats.itemsCollected,
+                items_sold = farmStats.itemsSold,
+                money_collected = farmStats.moneyCollected,
+                money_sold = farmStats.moneySold,
+                autofarm_status = isAutofarmEnabled,
+                autosell_status = isAutosellEnabled,
+                inventory_total = totalItems,
+                inventory_sellable = sellableItems,
+                inventory_sellable_value = sellableValue,
+                lucky_arrows = luckyArrows,
+                lucky_masks = luckyMasks,
+                current_account = game.Players.LocalPlayer.Name
+            }
+            
+            print("[DEBUG] Отправка статистики на http://localhost:5000/api/stats")
+            print("[DEBUG] Данные: " .. game:GetService("HttpService"):JSONEncode(statsData))
+            
+            local HttpService = game:GetService("HttpService")
+            local response = request({
+                Url = "http://localhost:5000/api/stats",
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(statsData)
+            })
+            
+            print("[DEBUG] Ответ сервера: " .. response.StatusCode)
+            print("[DEBUG] Тело ответа: " .. response.Body)
+            
+            Library:Notify({
+                Title = "Статистика отправлена",
+                Content = "Код ответа: " .. response.StatusCode,
+                Duration = 3
+            })
+        end)
+        
+        if not success then
+            print("[DEBUG] ОШИБКА отправки статистики: " .. tostring(err))
+            Library:Notify({
+                Title = "ОШИБКА!",
+                Content = tostring(err),
+                Duration = 5
+            })
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Проверка _G переменных",
+    Description = "Показывает сохраненные настройки для автозапуска",
+    Callback = function()
+        print("[DEBUG] === Проверка _G переменных ===")
+        print("[DEBUG] _G.YBAEnhancedLoaded: " .. tostring(_G.YBAEnhancedLoaded))
+        print("[DEBUG] _G.YBAAutoRestart: " .. tostring(_G.YBAAutoRestart))
+        print("[DEBUG] _G.YBAAutoFarmEnabled: " .. tostring(_G.YBAAutoFarmEnabled))
+        print("[DEBUG] _G.YBAAutoSellEnabled: " .. tostring(_G.YBAAutoSellEnabled))
+        print("[DEBUG] _G.YBAAutoServerHop: " .. tostring(_G.YBAAutoServerHop))
+        
+        if _G.YBAFarmItems then
+            print("[DEBUG] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
+        else
+            print("[DEBUG] _G.YBAFarmItems: nil")
+        end
+        
+        if _G.YBASellItems then
+            print("[DEBUG] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
+        else
+            print("[DEBUG] _G.YBASellItems: nil")
+        end
+        
+        local content = "Loaded: " .. tostring(_G.YBAEnhancedLoaded) .. "\n"
+        content = content .. "AutoRestart: " .. tostring(_G.YBAAutoRestart) .. "\n"
+        content = content .. "Autofarm: " .. tostring(_G.YBAAutoFarmEnabled) .. "\n"
+        content = content .. "Autosell: " .. tostring(_G.YBAAutoSellEnabled)
+        
+        Library:Notify({
+            Title = "_G Переменные",
+            Content = content,
+            Duration = 5
+        })
+        
+        print("[DEBUG] === Проверка завершена ===")
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Тест: Симуляция автозапуска",
+    Description = "Симулирует автозапуск после свапа сервера",
+    Callback = function()
+        Library:Notify({
+            Title = "Тест: Автозапуск",
+            Content = "Симуляция автозапуска...",
+            Duration = 3
+        })
+        
+        print("[DEBUG] === Симуляция автозапуска ===")
+        
+        -- Сохраняем текущие настройки в _G
+        _G.YBAAutoRestart = true
+        _G.YBAAutoFarmEnabled = Settings.Autofarm
+        _G.YBAAutoSellEnabled = Settings.Autosell
+        _G.YBAFarmItems = Settings.FarmItems
+        _G.YBASellItems = Settings.SellItems
+        _G.YBAAutoServerHop = Settings.AutoServerHop
+        
+        print("[DEBUG] Настройки сохранены в _G")
+        print("[DEBUG] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+        print("[DEBUG] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+        print("[DEBUG] AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
+        
+        Library:Notify({
+            Title = "Тест: Сохранено",
+            Content = "Настройки сохранены в _G переменные",
+            Duration = 3
+        })
+        
+        task.wait(2)
+        
+        -- Симулируем автозапуск
+        if _G.YBAAutoRestart then
+            print("[DEBUG] Обнаружен флаг автозапуска!")
+            
+            Library:Notify({
+                Title = "Тест: Автозапуск",
+                Content = "Восстановление настроек...",
+                Duration = 3
+            })
+            
+            if _G.YBAFarmItems then
+                print("[DEBUG] Восстановление FarmItems")
+                Settings.FarmItems = _G.YBAFarmItems
+            end
+            if _G.YBASellItems then
+                print("[DEBUG] Восстановление SellItems")
+                Settings.SellItems = _G.YBASellItems
+            end
+            if _G.YBAAutoServerHop ~= nil then
+                Settings.AutoServerHop = _G.YBAAutoServerHop
+            end
+            
+            task.wait(1)
+            
+            if Options.FarmItems and Settings.FarmItems then
+                Options.FarmItems:SetValue(Settings.FarmItems)
+                print("[DEBUG] FarmItems установлены в UI")
+            end
+            if Options.SellItems and Settings.SellItems then
+                Options.SellItems:SetValue(Settings.SellItems)
+                print("[DEBUG] SellItems установлены в UI")
+            end
+            
+            Library:Notify({
+                Title = "Тест: Успех",
+                Content = "Настройки восстановлены! (автофарм НЕ запущен)",
+                Duration = 5
+            })
+            
+            print("[DEBUG] === Симуляция завершена успешно ===")
+        end
+    end
+})
+
+DebugTab:AddButton({
+    Title = "Очистить консоль",
+    Description = "Очищает вывод в консоль",
+    Callback = function()
+        print("\n\n\n\n\n\n\n\n\n\n")
+        print("[DEBUG] Консоль очищена")
+        Library:Notify({
+            Title = "Debug",
+            Content = "Консоль очищена",
+            Duration = 2
+        })
+    end
+})
+
+SettingsTab:AddToggle("UnlockZoom", {
+    Title = "Unlock Zoom",
+    Description = "Remove camera zoom distance limit",
+    Default = Settings.UnlockZoom,
+    Callback = function(Value)
+        Settings.UnlockZoom = Value
+        saveSettings()
+        
+        if Value then
+            Player.CameraMaxZoomDistance = math.huge
+            Player.CameraMinZoomDistance = 0
+        else
+            Player.CameraMaxZoomDistance = 128
+            Player.CameraMinZoomDistance = 0.5
+        end
+    end
+})
+
+SettingsTab:AddToggle("CustomConsole", {
+    Title = "Custom Console",
+    Description = "Enable custom debug console",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            StartConsole()
+        else
+            StopConsole()
+        end
+    end
+})
+
+SettingsTab:AddButton({
+    Title = "Destroy Script",
+    Description = "Completely remove the script",
+    Callback = function()
+        pcall(function()
+            DestroyAllFunctions()
+        end)
+    end
+})
+
+-- Update player list periodically
+globalConnections.playerListUpdate = spawn(function()
+    while not ScriptDestroyed do
+        wait(5)
+        if PlayerDropdown then
+            PlayerDropdown:SetValues(GetAlivePlayers())
+        end
+    end
+end)
+
+-- Character respawn handling
+globalConnections.characterAdded = Player.CharacterAdded:Connect(function(newCharacter)
+    if ScriptDestroyed then return end
+    wait(1)
+    
+    if Settings.Speed then
+        StartSpeed()
+    end
+    if Settings.InfiniteJump then
+        StartInfiniteJump()
+    end
+    if Settings.JumpHack then
+        StartJumpHack()
+    end
+    
+    local humanoid = newCharacter:WaitForChild("Humanoid")
+    humanoid.Died:Connect(function()
+        task.wait(5)
+        if Settings.Autofarm then
+            StartAutofarm()
+        end
+    end)
+    
+    if Settings.Autofarm then
+        task.wait(0.5)
+        StartAutofarm()
+    end
+end)
+
+-- ESP Update Loop (60 FPS)
+task.spawn(function() while task.wait(0.016) do Colors.Rainbow = Color3.fromHSV(tick() * ESPSettings.RainbowSpeed % 1, 1, 1) end end)
+globalConnections.espUpdate = RunService.RenderStepped:Connect(function()
+    if not ESPSettings.Enabled then DisableESP() return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if not Drawings.ESP[player] then CreateESP(player) end
+            UpdateESP(player)
+        end
+    end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer and Drawing then CreateESP(player) end
+end)
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+if Drawing then
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then CreateESP(player) end
+    end
+end
+
+-- КРИТИЧНО: Автозагрузчик для server hop (queue_on_teleport)
+local queueFunc = syn and syn.queue_on_teleport or queue_on_teleport or fluxus and fluxus.queue_on_teleport
+
+if queueFunc then
+    print("[YBA Enhanced] queue_on_teleport поддерживается! Автозагрузка активна.")
+    
+    game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(State)
+        if State == Enum.TeleportState.Started then
+            print("[YBA Enhanced] Телепортация началась - сохранение настроек...")
+            
+            -- Сохраняем все настройки перед телепортом
+            _G.YBAAutoRestart = true
+            _G.YBAAutoFarmEnabled = Settings.Autofarm
+            _G.YBAAutoSellEnabled = Settings.Autosell
+            _G.YBAFarmItems = Settings.FarmItems
+            _G.YBASellItems = Settings.SellItems
+            _G.YBAAutoServerHop = Settings.AutoServerHop
+            
+            print("[YBA Enhanced] Настройки сохранены в _G переменные")
+            print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+            print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+            print("[YBA Enhanced] AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
+            
+            -- КРИТИЧНО: Загружаем скрипт через GitHub URL
+            local scriptCode = [[repeat task.wait() until game:IsLoaded()
+task.wait(2)
+print("[YBA Autoload] Загрузка скрипта с GitHub...")
+local success, err = pcall(function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/yba_enhanced_fixed.lua"))()
+end)
+if success then
+    print("[YBA Autoload] Скрипт загружен успешно!")
+else
+    print("[YBA Autoload] ОШИБКА: " .. tostring(err))
+end]]
+            
+            queueFunc(scriptCode)
+            print("[YBA Enhanced] Скрипт добавлен в queue_on_teleport!")
+        end
+    end)
+else
+    print("[YBA Enhanced] ВНИМАНИЕ: queue_on_teleport не поддерживается! Используй autoexec папку.")
+end
+
+-- УДАЛЕНО: Автозапуск теперь происходит ПОСЛЕ нажатия кнопки Play (см. выше)
+
+-- Apply startup settings after a small delay to ensure everything is loaded
+globalConnections.startupSettings = spawn(function()
+    wait(1)
+    if ScriptDestroyed then return end
+    
+    if Settings.Fly then StartFly() end
+    if Settings.NoClip then StartNoClip() end
+    if Settings.Speed then StartSpeed() end
+    if Settings.InfiniteJump then StartInfiniteJump() end
+    if Settings.JumpHack then StartJumpHack() end
+    if Settings.StandControl then StartStandControl() end
+    if Settings.Autofarm then StartAutofarm() end
+    if Settings.Platform then CreateFarmPlatform() end
+    if Settings.AutoServerHop then StartCheaterDetection() end
+    if ESPSettings.Enabled and Drawing then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end
+    
+    -- Запускаем обработчик команд
+    StartCommandHandler()
+end)
+
+-- Save manager setup
+SaveManager:SetLibrary(Library)
+InterfaceManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("YBAEnhanced")
+SaveManager:SetFolder("YBAEnhanced/configs")
+
+InterfaceManager:BuildInterfaceSection(SettingsTab)
+SaveManager:BuildConfigSection(SettingsTab)
+
+-- Load default config
+SaveManager:LoadAutoloadConfig()
+
+Window:SelectTab(1)
+
+if _G.YBAEnhancedReloaded then
+    Library:Notify({
+        Title = "YBA Enhanced",
+        Content = "Скрипт перезагружен успешно!",
+        Duration = 5
+    })
+    _G.YBAEnhancedReloaded = false
+else
+    Library:Notify({
+        Title = "YBA",
+        Content = "Script loaded successfully!",
+        Duration = 5
+    })
+end
