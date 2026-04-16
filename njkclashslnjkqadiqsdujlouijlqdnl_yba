@@ -377,36 +377,62 @@ local function ServerHop()
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
     
+    -- КРИТИЧНО: Сохраняем настройки перед свапом
+    _G.YBAAutoRestart = true
+    _G.YBAAutoFarmEnabled = Settings.Autofarm
+    _G.YBAAutoSellEnabled = Settings.Autosell
+    _G.YBAFarmItems = Settings.FarmItems
+    _G.YBASellItems = Settings.SellItems
+    _G.YBAAutoServerHop = Settings.AutoServerHop
+    
+    print("[YBA Enhanced] Настройки сохранены для автозагрузки")
+    print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+    print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+    
+    -- КРИТИЧНО: Используем queue_on_teleport для автозагрузки скрипта
+    local queueteleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    
+    if queueteleport then
+        print("[YBA Enhanced] queue_on_teleport поддерживается! Скрипт загрузится автоматически.")
+        
+        -- ЗАМЕНИ URL НА СВОЙ!
+        local scriptURL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/yba_enhanced_fixed.lua"
+        
+        queueteleport([[loadstring(game:HttpGet("]] .. scriptURL .. [["))()]])
+        
+        Library:Notify({
+            Title = "Автозагрузка",
+            Content = "Скрипт загрузится автоматически после телепорта!",
+            Duration = 3
+        })
+    else
+        print("[YBA Enhanced] queue_on_teleport НЕ поддерживается. Используй autoloader.")
+        Library:Notify({
+            Title = "Внимание",
+            Content = "Используй autoloader для автозагрузки!",
+            Duration = 5
+        })
+    end
+    
     local success, result = pcall(function()
-        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        -- Улучшенный поиск серверов (как в Infinite Yield)
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true"))
         
         if servers and servers.data then
             local currentServerId = game.JobId
             local availableServers = {}
             
             for _, server in pairs(servers.data) do
-                if server.id ~= currentServerId and server.playing < server.maxPlayers then
-                    table.insert(availableServers, server.id)
+                if type(server) == "table" and tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing < server.maxPlayers and server.id ~= currentServerId then
+                    table.insert(availableServers, 1, server.id)
                 end
             end
             
             if #availableServers > 0 then
                 local randomServer = availableServers[math.random(1, #availableServers)]
                 
-                -- КРИТИЧНО: Сохраняем настройки перед свапом
-                _G.YBAAutoRestart = true
-                _G.YBAAutoFarmEnabled = Settings.Autofarm
-                _G.YBAAutoSellEnabled = Settings.Autosell
-                _G.YBAFarmItems = Settings.FarmItems
-                _G.YBASellItems = Settings.SellItems
-                _G.YBAAutoServerHop = Settings.AutoServerHop  -- ВАЖНО: Сохраняем статус детектора
-                
-                -- Сохраняем скрипт для автозагрузки
-                _G.YBAScriptURL = "https://raw.githubusercontent.com/YOUR_SCRIPT_URL_HERE.lua"  -- ЗАМЕНИ НА СВОЙ URL!
-                
-                print("[YBA Enhanced] Настройки сохранены для автозагрузки")
-                print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-                print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+                print("[YBA Enhanced] Найдено серверов: " .. #availableServers)
+                print("[YBA Enhanced] Телепорт на сервер: " .. randomServer)
                 
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player)
             else
@@ -1145,12 +1171,18 @@ local function StartAutofarm()
     _G.YBAAutoFarmEnabled = true
     _G.YBAFarmItems = Settings.FarmItems
     
-    -- Сбрасываем счетчики при запуске
-    farmStats.itemsCollected = 0
-    farmStats.itemsSold = 0
-    farmStats.moneyCollected = 0
-    farmStats.moneySold = 0
-    farmStats.startTime = tick()
+    -- КРИТИЧНО: НЕ сбрасываем счетчики! Они должны накапливаться
+    -- Сбрасываем ТОЛЬКО при первом запуске скрипта
+    if farmStats.startTime == 0 or not farmStats.startTime then
+        farmStats.itemsCollected = 0
+        farmStats.itemsSold = 0
+        farmStats.moneyCollected = 0
+        farmStats.moneySold = 0
+        farmStats.startTime = tick()
+        print("[Autofarm] Счетчики инициализированы")
+    else
+        print("[Autofarm] Продолжение фарма. Собрано: " .. farmStats.itemsCollected .. ", Продано: " .. farmStats.itemsSold)
+    end
     
     if not farmPlatform then
         CreateFarmPlatform()
