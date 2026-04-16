@@ -366,6 +366,24 @@ _G.YBAAutoServerHop = Settings.AutoServerHop or false
 _G.YBAFarmItems = Settings.FarmItems or {}
 _G.YBASellItems = Settings.SellItems or {}
 
+-- КРИТИЧНО: Восстанавливаем счетчики из _G если они есть
+if _G.YBAItemsCollected then
+    farmStats.itemsCollected = _G.YBAItemsCollected
+    print("[YBA Enhanced] Восстановлено itemsCollected: " .. farmStats.itemsCollected)
+end
+if _G.YBAMoneyCollected then
+    farmStats.moneyCollected = _G.YBAMoneyCollected
+    print("[YBA Enhanced] Восстановлено moneyCollected: " .. farmStats.moneyCollected)
+end
+if _G.YBAItemsSold then
+    farmStats.itemsSold = _G.YBAItemsSold
+    print("[YBA Enhanced] Восстановлено itemsSold: " .. farmStats.itemsSold)
+end
+if _G.YBAMoneySold then
+    farmStats.moneySold = _G.YBAMoneySold
+    print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
+end
+
 -- Server Hop Function (ДОЛЖНА БЫТЬ ПЕРЕД StartCheaterDetection)
 local function ServerHop()
     Library:Notify({
@@ -1171,9 +1189,8 @@ local function StartAutofarm()
     _G.YBAAutoFarmEnabled = true
     _G.YBAFarmItems = Settings.FarmItems
     
-    -- КРИТИЧНО: НЕ сбрасываем счетчики! Они должны накапливаться
-    -- Сбрасываем ТОЛЬКО при первом запуске скрипта
-    if farmStats.startTime == 0 or not farmStats.startTime then
+    -- КРИТИЧНО: Инициализируем счетчики ТОЛЬКО если они не существуют
+    if not farmStats.startTime or farmStats.startTime == 0 then
         farmStats.itemsCollected = 0
         farmStats.itemsSold = 0
         farmStats.moneyCollected = 0
@@ -1349,8 +1366,12 @@ local function StartAutofarm()
                         -- КРИТИЧНО: Увеличиваем счетчики СРАЗУ после подбора
                         local itemPrice = itemPrices[itemName] or 0
                         
-                        farmStats.itemsCollected = farmStats.itemsCollected + 1
-                        farmStats.moneyCollected = farmStats.moneyCollected + itemPrice
+                        farmStats.itemsCollected = (farmStats.itemsCollected or 0) + 1
+                        farmStats.moneyCollected = (farmStats.moneyCollected or 0) + itemPrice
+                        
+                        -- КРИТИЧНО: Сохраняем в _G для сохранения между сессиями
+                        _G.YBAItemsCollected = farmStats.itemsCollected
+                        _G.YBAMoneyCollected = farmStats.moneyCollected
                         
                         print("[Autofarm] Собран: " .. itemName .. " ($" .. itemPrice .. ") | Всего: " .. farmStats.itemsCollected .. " предметов")
                         print("[Autofarm] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
@@ -1626,8 +1647,13 @@ local function StartAutosell()
                     
                     if SellItem(itemName) then
                         itemsSold = itemsSold + 1
-                        farmStats.itemsSold = farmStats.itemsSold + 1
-                        farmStats.moneySold = farmStats.moneySold + itemPrice
+                        farmStats.itemsSold = (farmStats.itemsSold or 0) + 1
+                        farmStats.moneySold = (farmStats.moneySold or 0) + itemPrice
+                        
+                        -- КРИТИЧНО: Сохраняем в _G для сохранения между сессиями
+                        _G.YBAItemsSold = farmStats.itemsSold
+                        _G.YBAMoneySold = farmStats.moneySold
+                        
                         print("[Autosell] Продан " .. itemName .. " за $" .. itemPrice .. " (баланс: $" .. (currentMoney + itemPrice) .. ")")
                         print("[Autosell] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
                     end
@@ -1968,23 +1994,30 @@ local function StartCommandHandler()
                 end
                 
                 -- НОВОЕ: Расчет прогноза до $1,000,000
-                local moneyNeeded = 1000000 - money
+                local moneyNeeded = math.max(0, 1000000 - money)
                 local timeToMillion = 0
                 local itemsToMillion = 0
+                local hoursToMillion = 0
+                local minutesToMillion = 0
                 
-                if uptime > 60 and farmStats.moneySold > 0 then
+                if uptime > 60 and farmStats.moneySold and farmStats.moneySold > 0 then
                     -- Скорость фарма денег в секунду
                     local moneyPerSecond = farmStats.moneySold / uptime
                     
                     if moneyPerSecond > 0 and moneyNeeded > 0 then
                         timeToMillion = math.ceil(moneyNeeded / moneyPerSecond)
+                        hoursToMillion = math.floor(timeToMillion / 3600)
+                        minutesToMillion = math.floor((timeToMillion % 3600) / 60)
                         
                         -- Средняя цена проданного предмета
-                        local avgItemPrice = farmStats.itemsSold > 0 and (farmStats.moneySold / farmStats.itemsSold) or 0
+                        local avgItemPrice = (farmStats.itemsSold and farmStats.itemsSold > 0) and (farmStats.moneySold / farmStats.itemsSold) or 0
                         if avgItemPrice > 0 then
                             itemsToMillion = math.ceil(moneyNeeded / avgItemPrice)
                         end
                     end
+                elseif moneyNeeded == 0 then
+                    timeToMillion = 0
+                    itemsToMillion = 0
                 end
                 
                 local statsData = {
@@ -2004,10 +2037,12 @@ local function StartCommandHandler()
                     current_account = game.Players.LocalPlayer.Name,
                     -- НОВОЕ: Прогноз
                     money_needed = moneyNeeded,
-                    time_to_million = timeToMillion,
+                    time_to_million_seconds = timeToMillion,
+                    time_to_million_hours = hoursToMillion,
+                    time_to_million_minutes = minutesToMillion,
                     items_to_million = itemsToMillion,
-                    money_per_hour = uptime > 0 and math.floor((farmStats.moneySold / uptime) * 3600) or 0,
-                    items_per_hour = uptime > 0 and math.floor((farmStats.itemsSold / uptime) * 3600) or 0
+                    money_per_hour = uptime > 0 and farmStats.moneySold and math.floor((farmStats.moneySold / uptime) * 3600) or 0,
+                    items_per_hour = uptime > 0 and farmStats.itemsSold and math.floor((farmStats.itemsSold / uptime) * 3600) or 0
                 }
                 
                 -- Отправляем статистику на сервер
@@ -2142,10 +2177,12 @@ end
 
 -- ESP Functions
 local function CreateESP(player)
-    if not DrawingSupported then return end
+    if not DrawingSupported or not Drawing then 
+        print("[ESP] Drawing API not supported")
+        return 
+    end
     if player == LocalPlayer then return end
     if Drawings.ESP[player] then RemoveESP(player) end
-    if not Drawing then return end
     
     local success, err = pcall(function()
         local box = {TopLeft = Drawing.new("Line"), TopRight = Drawing.new("Line"), BottomLeft = Drawing.new("Line"), BottomRight = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line"), Top = Drawing.new("Line"), Bottom = Drawing.new("Line")}
@@ -2599,7 +2636,7 @@ MovementTab:AddSlider("JumpHeight", {
 
 -- ESP Tab
 local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
-ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() elseif DrawingSupported then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end else Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false end end})
+ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = false, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false return end ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() end})
