@@ -4261,7 +4261,7 @@ if queueFunc then
 task.wait(2)
 print("[YBA Autoload] Загрузка скрипта с GitHub...")
 local success, err = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/yba_enhanced_fixed.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"))()
 end)
 if success then
     print("[YBA Autoload] Скрипт загружен успешно!")
