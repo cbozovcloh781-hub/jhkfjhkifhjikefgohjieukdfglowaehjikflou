@@ -309,6 +309,9 @@ local Colors = {Enemy = Color3.fromRGB(255, 25, 25), Ally = Color3.fromRGB(25, 2
 local ESPSettings = {Enabled = false, TeamCheck = false, ShowTeam = false, VisibilityCheck = true, BoxESP = false, BoxStyle = "Corner", BoxOutline = true, BoxFilled = false, BoxFillTransparency = 0.5, BoxThickness = 1, TracerESP = false, TracerOrigin = "Bottom", TracerStyle = "Line", TracerThickness = 1, HealthESP = false, HealthStyle = "Bar", HealthBarSide = "Left", HealthTextSuffix = "HP", NameESP = false, NameMode = "DisplayName", ShowDistance = true, DistanceUnit = "studs", TextSize = 14, TextFont = 2, RainbowSpeed = 1, MaxDistance = 1000, RefreshRate = 0.016, Snaplines = false, SnaplineStyle = "Straight", RainbowEnabled = false, RainbowBoxes = false, RainbowTracers = false, RainbowText = false, ChamsEnabled = false, ChamsOutlineColor = Color3.fromRGB(255, 255, 255), ChamsFillColor = Color3.fromRGB(255, 0, 0), ChamsOccludedColor = Color3.fromRGB(150, 0, 0), ChamsTransparency = 0.5, ChamsOutlineTransparency = 0, ChamsOutlineThickness = 0.1, SkeletonESP = false, SkeletonColor = Color3.fromRGB(255, 255, 255), SkeletonThickness = 1.5, SkeletonTransparency = 1}
 local lastESPUpdate = {}
 
+-- Проверка поддержки Drawing API
+local DrawingSupported = Drawing ~= nil and pcall(function() Drawing.new("Line") end)
+
 -- Load/Save functions
 local function loadSettings()
     local success, saved = pcall(function()
@@ -2077,6 +2080,7 @@ end
 
 -- ESP Functions
 local function CreateESP(player)
+    if not DrawingSupported then return end
     if player == LocalPlayer then return end
     if Drawings.ESP[player] then RemoveESP(player) end
     if not Drawing then return end
@@ -2533,7 +2537,7 @@ MovementTab:AddSlider("JumpHeight", {
 
 -- ESP Tab
 local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
-ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() elseif Drawing then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end else Library:Notify({Title = "ESP", Content = "Drawing library not supported", Duration = 3}) end end})
+ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) ESPSettings.Enabled = Value saveSettings() if not Value then CleanupESP() elseif DrawingSupported then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end else Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false end end})
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() end})
@@ -4211,23 +4215,25 @@ end)
 
 -- ESP Update Loop (60 FPS)
 task.spawn(function() while task.wait(0.016) do Colors.Rainbow = Color3.fromHSV(tick() * ESPSettings.RainbowSpeed % 1, 1, 1) end end)
-globalConnections.espUpdate = RunService.RenderStepped:Connect(function()
-    if not ESPSettings.Enabled then DisableESP() return end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if not Drawings.ESP[player] then CreateESP(player) end
-            UpdateESP(player)
+if DrawingSupported then
+    globalConnections.espUpdate = RunService.RenderStepped:Connect(function()
+        if not ESPSettings.Enabled then DisableESP() return end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if not Drawings.ESP[player] then CreateESP(player) end
+                UpdateESP(player)
+            end
         end
-    end
-end)
+    end)
+end
 
 Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer and Drawing then CreateESP(player) end
+    if player ~= LocalPlayer and DrawingSupported then CreateESP(player) end
 end)
 
 Players.PlayerRemoving:Connect(RemoveESP)
 
-if Drawing then
+if DrawingSupported then
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then CreateESP(player) end
     end
@@ -4293,9 +4299,9 @@ globalConnections.startupSettings = spawn(function()
     if Settings.Autofarm then StartAutofarm() end
     if Settings.Platform then CreateFarmPlatform() end
     if Settings.AutoServerHop then StartCheaterDetection() end
-    if ESPSettings.Enabled and Drawing then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end
+    if ESPSettings.Enabled and DrawingSupported then for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end
     
-    -- Запускаем обработчик команд
+    -- КРИТИЧНО: Запускаем обработчик команд автоматически
     StartCommandHandler()
 end)
 
