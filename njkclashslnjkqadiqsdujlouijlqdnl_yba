@@ -206,8 +206,18 @@ task.spawn(function()
             Settings.AutoServerHop = _G.YBAAutoServerHop
         end
         
-        -- Восстанавливаем выбранные предметы в UI
+        -- КРИТИЧНО: Восстанавливаем выбранные предметы В НАСТРОЙКАХ (не только UI)
         task.wait(1)
+        if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
+            Settings.FarmItems = _G.YBAFarmItems
+            print("[YBA Enhanced] FarmItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+        end
+        if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
+            Settings.SellItems = _G.YBASellItems
+            print("[YBA Enhanced] SellItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+        end
+        
+        -- Восстанавливаем в UI (БЕЗ вызова Callback)
         if Options.FarmItems and Settings.FarmItems then
             Options.FarmItems:SetValue(Settings.FarmItems)
             print("[YBA Enhanced] FarmItems установлены в UI")
@@ -223,12 +233,14 @@ task.spawn(function()
             task.wait(1)
             Settings.Autofarm = true
             
-            -- КРИТИЧНО: Обновляем тумблер в UI
+            -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autofarm then
                 Options.Autofarm:SetValue(true)
                 print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
             end
             
+            -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutofarm ВРУЧНУЮ!
+            print("[YBA Enhanced] Запуск StartAutofarm()...")
             StartAutofarm()
             
             Library:Notify({
@@ -243,12 +255,14 @@ task.spawn(function()
             print("[YBA Enhanced] Автозапуск автопродажи...")
             Settings.Autosell = true
             
-            -- КРИТИЧНО: Обновляем тумблер в UI
+            -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autosell then
                 Options.Autosell:SetValue(true)
                 print("[YBA Enhanced] Тумблер Autosell установлен в ON")
             end
             
+            -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutosell ВРУЧНУЮ!
+            print("[YBA Enhanced] Запуск StartAutosell()...")
             StartAutosell()
         end
         
@@ -2952,12 +2966,15 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     end
 })
 
--- КРИТИЧНО: Восстанавливаем выбранные предметы из _G
-if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
-    task.wait(0.1)
-    Options.FarmItems:SetValue(_G.YBAFarmItems)
-    print("[YBA Enhanced] FarmItems восстановлены в UI")
-end
+-- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
+task.spawn(function()
+    task.wait(0.5)  -- Ждем создания Options
+    if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil and Options.FarmItems then
+        Settings.FarmItems = _G.YBAFarmItems  -- ВАЖНО: Обновляем Settings!
+        Options.FarmItems:SetValue(_G.YBAFarmItems)
+        print("[YBA Enhanced] FarmItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
+    end
+end)
 
 AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
@@ -2989,12 +3006,15 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     end
 })
 
--- КРИТИЧНО: Восстанавливаем выбранные предметы из _G
-if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
-    task.wait(0.1)
-    Options.SellItems:SetValue(_G.YBASellItems)
-    print("[YBA Enhanced] SellItems восстановлены в UI")
-end
+-- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
+task.spawn(function()
+    task.wait(0.5)  -- Ждем создания Options
+    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options.SellItems then
+        Settings.SellItems = _G.YBASellItems  -- ВАЖНО: Обновляем Settings!
+        Options.SellItems:SetValue(_G.YBASellItems)
+        print("[YBA Enhanced] SellItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
+    end
+end)
 
 -- === СТАТИСТИКА ===
 AutoTab:AddButton({
