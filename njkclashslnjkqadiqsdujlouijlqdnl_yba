@@ -189,9 +189,12 @@ task.spawn(function()
     -- Проверяем флаг автозапуска
     if _G.YBAAutoRestart then
         print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
+        print("[YBA Enhanced] _G.YBAAutoFarmEnabled = " .. tostring(_G.YBAAutoFarmEnabled))
+        print("[YBA Enhanced] _G.YBAAutoSellEnabled = " .. tostring(_G.YBAAutoSellEnabled))
         
         -- Ждем загрузки UI
-        task.wait(2)
+        print("[YBA Enhanced] Ожидание загрузки UI...")
+        task.wait(3)  -- Увеличена задержка для полной загрузки UI
         
         -- Восстанавливаем настройки
         if _G.YBAFarmItems then
@@ -218,52 +221,104 @@ task.spawn(function()
         end
         
         -- Восстанавливаем в UI (БЕЗ вызова Callback)
+        print("[YBA Enhanced] Ожидание создания Options...")
+        local maxWait = 10
+        local waited = 0
+        while (not Options.FarmItems or not Options.SellItems) and waited < maxWait do
+            task.wait(0.5)
+            waited = waited + 0.5
+            print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
+        end
+        
         if Options.FarmItems and Settings.FarmItems then
             Options.FarmItems:SetValue(Settings.FarmItems)
             print("[YBA Enhanced] FarmItems установлены в UI")
+        else
+            print("[YBA Enhanced] ОШИБКА: Options.FarmItems не найден!")
         end
         if Options.SellItems and Settings.SellItems then
             Options.SellItems:SetValue(Settings.SellItems)
             print("[YBA Enhanced] SellItems установлены в UI")
+        else
+            print("[YBA Enhanced] ОШИБКА: Options.SellItems не найден!")
         end
         
         -- АВТОЗАПУСК АВТОФАРМА
         if _G.YBAAutoFarmEnabled then
             print("[YBA Enhanced] Автозапуск автофарма...")
-            task.wait(1)
+            task.wait(2)  -- Увеличена задержка для полной загрузки
+            
+            -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autofarm = true
+            
+            -- Ждем создания Options
+            local waitTime = 0
+            while not Options.Autofarm and waitTime < 5 do
+                task.wait(0.5)
+                waitTime = waitTime + 0.5
+                print("[YBA Enhanced] Ожидание Options.Autofarm... (" .. waitTime .. "с)")
+            end
             
             -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autofarm then
                 Options.Autofarm:SetValue(true)
                 print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
+            else
+                print("[YBA Enhanced] ОШИБКА: Options.Autofarm не найден!")
             end
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutofarm ВРУЧНУЮ!
             print("[YBA Enhanced] Запуск StartAutofarm()...")
-            StartAutofarm()
+            if StartAutofarm then
+                StartAutofarm()
+                print("[YBA Enhanced] StartAutofarm() выполнен успешно")
+            else
+                print("[YBA Enhanced] ОШИБКА: Функция StartAutofarm не найдена!")
+            end
             
             Library:Notify({
                 Title = "Автозапуск",
                 Content = "Автофарм запущен после server hop!",
                 Duration = 5
             })
+        else
+            print("[YBA Enhanced] Автофарм НЕ будет запущен (_G.YBAAutoFarmEnabled = false)")
         end
         
         -- АВТОЗАПУСК АВТОПРОДАЖИ
         if _G.YBAAutoSellEnabled then
             print("[YBA Enhanced] Автозапуск автопродажи...")
+            task.wait(1)
+            
+            -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autosell = true
+            
+            -- Ждем создания Options
+            local waitTime = 0
+            while not Options.Autosell and waitTime < 5 do
+                task.wait(0.5)
+                waitTime = waitTime + 0.5
+                print("[YBA Enhanced] Ожидание Options.Autosell... (" .. waitTime .. "с)")
+            end
             
             -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autosell then
                 Options.Autosell:SetValue(true)
                 print("[YBA Enhanced] Тумблер Autosell установлен в ON")
+            else
+                print("[YBA Enhanced] ОШИБКА: Options.Autosell не найден!")
             end
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutosell ВРУЧНУЮ!
             print("[YBA Enhanced] Запуск StartAutosell()...")
-            StartAutosell()
+            if StartAutosell then
+                StartAutosell()
+                print("[YBA Enhanced] StartAutosell() выполнен успешно")
+            else
+                print("[YBA Enhanced] ОШИБКА: Функция StartAutosell не найдена!")
+            end
+        else
+            print("[YBA Enhanced] Автопродажа НЕ будет запущена (_G.YBAAutoSellEnabled = false)")
         end
         
         -- АВТОЗАПУСК ДЕТЕКТОРА ЧИТЕРОВ
@@ -472,7 +527,12 @@ local farmStats = {
     startTime = tick(),
     moneyCollected = 0,
     moneySold = 0,
-    serverHops = 0  -- НОВОЕ: Счетчик свапов сервера
+    serverHops = 0,  -- НОВОЕ: Счетчик свапов сервера
+    -- НОВОЕ: Предыдущие значения для вычисления прибавки
+    prevItemsCollected = 0,
+    prevItemsSold = 0,
+    prevMoneyCollected = 0,
+    prevMoneySold = 0
 }
 
 -- ESP variables
@@ -577,18 +637,22 @@ end
 -- КРИТИЧНО: Восстанавливаем счетчики из _G если они есть
 if _G.YBAItemsCollected then
     farmStats.itemsCollected = _G.YBAItemsCollected
+    farmStats.prevItemsCollected = _G.YBAItemsCollected  -- НОВОЕ: Инициализируем предыдущее значение
     print("[YBA Enhanced] Восстановлено itemsCollected: " .. farmStats.itemsCollected)
 end
 if _G.YBAMoneyCollected then
     farmStats.moneyCollected = _G.YBAMoneyCollected
+    farmStats.prevMoneyCollected = _G.YBAMoneyCollected  -- НОВОЕ: Инициализируем предыдущее значение
     print("[YBA Enhanced] Восстановлено moneyCollected: " .. farmStats.moneyCollected)
 end
 if _G.YBAItemsSold then
     farmStats.itemsSold = _G.YBAItemsSold
+    farmStats.prevItemsSold = _G.YBAItemsSold  -- НОВОЕ: Инициализируем предыдущее значение
     print("[YBA Enhanced] Восстановлено itemsSold: " .. farmStats.itemsSold)
 end
 if _G.YBAMoneySold then
     farmStats.moneySold = _G.YBAMoneySold
+    farmStats.prevMoneySold = _G.YBAMoneySold  -- НОВОЕ: Инициализируем предыдущее значение
     print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
 end
 if _G.YBAServerHops then
@@ -2265,6 +2329,18 @@ local function StartCommandHandler()
                 local hoursToMillion = 0
                 local minutesToMillion = 0
                 
+                -- НОВОЕ: Вычисляем прибавку с предыдущей отправки
+                local itemsCollectedDelta = farmStats.itemsCollected - farmStats.prevItemsCollected
+                local itemsSoldDelta = farmStats.itemsSold - farmStats.prevItemsSold
+                local moneyCollectedDelta = farmStats.moneyCollected - farmStats.prevMoneyCollected
+                local moneySoldDelta = farmStats.moneySold - farmStats.prevMoneySold
+                
+                -- Обновляем предыдущие значения
+                farmStats.prevItemsCollected = farmStats.itemsCollected
+                farmStats.prevItemsSold = farmStats.itemsSold
+                farmStats.prevMoneyCollected = farmStats.moneyCollected
+                farmStats.prevMoneySold = farmStats.moneySold
+                
                 if uptime > 60 and farmStats.moneySold and farmStats.moneySold > 0 then
                     -- Скорость фарма денег в секунду
                     local moneyPerSecond = farmStats.moneySold / uptime
@@ -2286,6 +2362,7 @@ local function StartCommandHandler()
                 end
                 
                 print("[Command Handler] Прогноз: Осталось $" .. moneyNeeded .. ", Время: " .. hoursToMillion .. "ч " .. minutesToMillion .. "м, Предметов: " .. itemsToMillion)
+                print("[Command Handler] Прибавка: Собрано +" .. itemsCollectedDelta .. " (+$" .. moneyCollectedDelta .. "), Продано +" .. itemsSoldDelta .. " (+$" .. moneySoldDelta .. ")")
                 
                 local statsData = {
                     balance = money,
@@ -2310,7 +2387,12 @@ local function StartCommandHandler()
                     time_to_million_minutes = minutesToMillion,
                     items_to_million = itemsToMillion,
                     money_per_hour = uptime > 0 and farmStats.moneySold and math.floor((farmStats.moneySold / uptime) * 3600) or 0,
-                    items_per_hour = uptime > 0 and farmStats.itemsSold and math.floor((farmStats.itemsSold / uptime) * 3600) or 0
+                    items_per_hour = uptime > 0 and farmStats.itemsSold and math.floor((farmStats.itemsSold / uptime) * 3600) or 0,
+                    -- НОВОЕ: Прибавка с предыдущей отправки
+                    items_collected_delta = itemsCollectedDelta,
+                    items_sold_delta = itemsSoldDelta,
+                    money_collected_delta = moneyCollectedDelta,
+                    money_sold_delta = moneySoldDelta
                 }
                 
                 -- Отправляем статистику на сервер
