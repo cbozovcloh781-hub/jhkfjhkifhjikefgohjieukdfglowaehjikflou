@@ -1,6 +1,17 @@
 -- Проверка на повторный запуск и очистка предыдущего экземпляра
 if _G.YBAEnhancedLoaded then
     print("[YBA Enhanced] Обнаружен предыдущий экземпляр скрипта. Выполняется очистка...")
+    
+    -- КРИТИЧНО: Удаляем старую консоль ДО вызова Cleanup
+    pcall(function()
+        local CoreGui = game:GetService("CoreGui")
+        local oldConsole = CoreGui:FindFirstChild("DexConsole")
+        if oldConsole then
+            oldConsole:Destroy()
+            print("[YBA Enhanced] Старая консоль удалена")
+        end
+    end)
+    
     pcall(function()
         if _G.YBAEnhancedCleanup then
             _G.YBAEnhancedCleanup()
@@ -2972,6 +2983,16 @@ local function DestroyAllFunctions()
         end
     end)
     
+    -- КРИТИЧНО: Удаляем старую консоль из CoreGui если она осталась
+    pcall(function()
+        local CoreGui = game:GetService("CoreGui")
+        local oldConsole = CoreGui:FindFirstChild("DexConsole")
+        if oldConsole then
+            oldConsole:Destroy()
+            print("[YBA Enhanced] Старая консоль удалена из CoreGui")
+        end
+    end)
+    
     -- Cleanup ESP completely
     pcall(function()
         ESPSettings.Enabled = false
@@ -3735,6 +3756,11 @@ function Console.AddLog(text, color)
     
     local timestamp = "[" .. os.date("%H:%M:%S") .. "] "
     
+    -- Экранируем специальные символы для RichText
+    local function escapeRichText(str)
+        return str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+    end
+    
     -- Определяем цвет по типу сообщения
     local colorHex = "#FFFFFF"
     
@@ -3762,8 +3788,12 @@ function Console.AddLog(text, color)
         )
     end
     
+    -- Экранируем текст
+    local escapedText = escapeRichText(text)
+    local escapedTimestamp = escapeRichText(timestamp)
+    
     -- Добавляем лог с цветом через RichText
-    local coloredText = '<font color="#969696">' .. timestamp .. '</font><font color="' .. colorHex .. '">' .. text .. '</font>\n'
+    local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
     consoleOutput.Text = consoleOutput.Text .. coloredText
     
     -- КРИТИЧНО: Обновляем CanvasSize после добавления текста
