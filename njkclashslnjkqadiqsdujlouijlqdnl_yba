@@ -372,8 +372,8 @@ task.spawn(function()
         -- Ждем загрузки UI
         task.wait(2)
         
-        -- Если автофарм был включен в настройках - запускаем
-        if Settings.Autofarm then
+        -- БЕЗОПАСНО: Проверяем что Settings существует
+        if Settings and Settings.Autofarm then
             print("[YBA Enhanced] Автозапуск автофарма (из настроек)...")
             task.wait(1)
             
@@ -393,7 +393,7 @@ task.spawn(function()
         end
         
         -- Если автопродажа была включена - запускаем
-        if Settings.Autosell then
+        if Settings and Settings.Autosell then
             print("[YBA Enhanced] Автозапуск автопродажи (из настроек)...")
             task.wait(0.5)
             
@@ -413,7 +413,7 @@ task.spawn(function()
         end
         
         -- Если детектор читеров был включен - запускаем
-        if Settings.AutoServerHop then
+        if Settings and Settings.AutoServerHop then
             print("[YBA Enhanced] Автозапуск детектора читеров (из настроек)...")
             StartCheaterDetection()
         end
@@ -804,43 +804,105 @@ local function ServerHop()
         })
     end
     
-    local success, result = pcall(function()
-        -- Улучшенный поиск серверов (как в Infinite Yield)
-        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true"))
+    -- НОВОЕ: Retry логика с автоматическим поиском нового сервера при GameFull
+    local maxRetries = 10
+    local retryCount = 0
+    local teleportSuccess = false
+    
+    while retryCount < maxRetries and not teleportSuccess do
+        retryCount = retryCount + 1
         
-        if servers and servers.data then
-            local currentServerId = game.JobId
-            local availableServers = {}
+        local success, result = pcall(function()
+            -- Улучшенный поиск серверов (как в Infinite Yield)
+            local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true"))
             
-            for _, server in pairs(servers.data) do
-                if type(server) == "table" and tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing < server.maxPlayers and server.id ~= currentServerId then
-                    table.insert(availableServers, 1, server.id)
+            if servers and servers.data then
+                local currentServerId = game.JobId
+                local availableServers = {}
+                
+                for _, server in pairs(servers.data) do
+                    if type(server) == "table" and tonumber(server.playing) and tonumber(server.maxPlayers) and server.playing < server.maxPlayers and server.id ~= currentServerId then
+                        table.insert(availableServers, 1, server.id)
+                    end
+                end
+                
+                if #availableServers > 0 then
+                    local randomServer = availableServers[math.random(1, #availableServers)]
+                    
+                    print("[YBA Enhanced] Попытка " .. retryCount .. "/" .. maxRetries)
+                    print("[YBA Enhanced] Найдено серверов: " .. #availableServers)
+                    print("[YBA Enhanced] Телепорт на сервер: " .. randomServer)
+                    
+                    -- НОВОЕ: Используем TeleportAsync с обработкой ошибок
+                    local teleportOptions = Instance.new("TeleportOptions")
+                    teleportOptions.ShouldReserveServer = false
+                    
+                    local teleportAttempt = 0
+                    local teleportError = nil
+                    
+                    -- Пытаемся телепортироваться с обработкой GameFull
+                    while teleportAttempt < 3 do
+                        teleportAttempt = teleportAttempt + 1
+                        
+                        local teleportSuccess, teleportResult = pcall(function()
+                            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player, nil, teleportOptions)
+                        end)
+                        
+                        if teleportSuccess then
+                            print("[YBA Enhanced] Телепорт успешен!")
+                            return true
+                        else
+                            teleportError = tostring(teleportResult)
+                            print("[YBA Enhanced] Ошибка телепорта (попытка " .. teleportAttempt .. "/3): " .. teleportError)
+                            
+                            -- Если сервер полный - пробуем другой сервер
+                            if teleportError:find("GameFull") or teleportError:find("full") then
+                                print("[YBA Enhanced] Сервер полный! Ищем другой сервер...")
+                                Library:Notify({
+                                    Title = "Свап сервера",
+                                    Content = "Сервер полный! Попытка " .. retryCount .. "/" .. maxRetries,
+                                    Duration = 2
+                                })
+                                break  -- Выходим из внутреннего цикла и ищем новый сервер
+                            else
+                                -- Другая ошибка - ждем и пробуем снова
+                                task.wait(1)
+                            end
+                        end
+                    end
+                    
+                    -- Если все 3 попытки неудачны - пробуем другой сервер
+                    if teleportError then
+                        return false
+                    end
+                else
+                    print("[YBA Enhanced] Нет доступных серверов")
+                    Library:Notify({
+                        Title = "Ошибка",
+                        Content = "Не найдено доступных серверов",
+                        Duration = 5
+                    })
+                    return false
                 end
             end
-            
-            if #availableServers > 0 then
-                local randomServer = availableServers[math.random(1, #availableServers)]
-                
-                print("[YBA Enhanced] Найдено серверов: " .. #availableServers)
-                print("[YBA Enhanced] Телепорт на сервер: " .. randomServer)
-                
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Player)
-            else
-                Library:Notify({
-                    Title = "Ошибка",
-                    Content = "Не найдено доступных серверов",
-                    Duration = 5
-                })
-            end
+        end)
+        
+        if success and result then
+            teleportSuccess = true
+            break
+        else
+            print("[YBA Enhanced] Попытка " .. retryCount .. " неудачна. Ищем другой сервер...")
+            task.wait(2)  -- Задержка перед следующей попыткой
         end
-    end)
+    end
     
-    if not success then
+    if not teleportSuccess then
         Library:Notify({
             Title = "Ошибка свапа",
-            Content = "Не удалось сменить сервер: " .. tostring(result),
+            Content = "Не удалось найти доступный сервер за " .. maxRetries .. " попыток",
             Duration = 5
         })
+        print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Не удалось сменить сервер за " .. maxRetries .. " попыток")
     end
 end
 
@@ -2457,11 +2519,6 @@ local function StartCommandHandler()
                     itemsToMillion = 0
                 end
                 
-                if Settings.DebugMode then
-                    print("[Command Handler] Прогноз: Осталось $" .. moneyNeeded .. ", Время: " .. hoursToMillion .. "ч " .. minutesToMillion .. "м, Предметов: " .. itemsToMillion)
-                    print("[Command Handler] Прибавка: Собрано +" .. itemsCollectedDelta .. " (+$" .. moneyCollectedDelta .. "), Продано +" .. itemsSoldDelta .. " (+$" .. moneySoldDelta .. ")")
-                end
-                
                 local statsData = {
                     balance = money,
                     uptime = uptime,
@@ -3482,22 +3539,210 @@ TeleportTab:AddButton({
     end
 })
 
--- Загружаем DEX Console модуль
-local Console = nil
-pcall(function()
-    -- Пробуем загрузить из файла
-    Console = loadfile("E:\\folders\\codes\\roblox\\games\\yba\\console.lua")()
+-- Загружаем DEX Console модуль (ВСТРОЕННЫЙ)
+local Console = {}
+local consoleGui = nil
+local consoleFrame = nil
+local consoleOutput = nil
+local consoleInput = nil
+local consoleEnabled = false
+
+function Console.Create()
+    if consoleGui then return end
+    
+    local CoreGui = game:GetService("CoreGui")
+    
+    consoleGui = Instance.new("ScreenGui")
+    consoleGui.Name = "DexConsole"
+    consoleGui.Parent = CoreGui
+    consoleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    consoleFrame = Instance.new("Frame")
+    consoleFrame.Name = "ConsoleFrame"
+    consoleFrame.Size = UDim2.new(0, 800, 0, 500)
+    consoleFrame.Position = UDim2.new(0.5, -400, 0.5, -250)
+    consoleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    consoleFrame.BorderSizePixel = 0
+    consoleFrame.Active = true
+    consoleFrame.Draggable = true
+    consoleFrame.Parent = consoleGui
+    
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = consoleFrame
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Size = UDim2.new(1, -60, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = "Output"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.SourceSans
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+    
+    -- Close Button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -30, 0, 0)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 14
+    closeBtn.Font = Enum.Font.SourceSansBold
+    closeBtn.Parent = titleBar
+    
+    closeBtn.MouseButton1Click:Connect(function()
+        Console.Destroy()
+    end)
+    
+    -- Output ScrollingFrame
+    consoleOutput = Instance.new("ScrollingFrame")
+    consoleOutput.Name = "Output"
+    consoleOutput.Size = UDim2.new(1, -10, 1, -75)
+    consoleOutput.Position = UDim2.new(0, 5, 0, 35)
+    consoleOutput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    consoleOutput.BorderSizePixel = 0
+    consoleOutput.ScrollBarThickness = 6
+    consoleOutput.CanvasSize = UDim2.new(0, 0, 0, 0)
+    consoleOutput.Parent = consoleFrame
+    
+    local outputList = Instance.new("UIListLayout")
+    outputList.SortOrder = Enum.SortOrder.LayoutOrder
+    outputList.Padding = UDim.new(0, 2)
+    outputList.Parent = consoleOutput
+    
+    outputList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        consoleOutput.CanvasSize = UDim2.new(0, 0, 0, outputList.AbsoluteContentSize.Y + 10)
+        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.CanvasSize.Y.Offset)
+    end)
+    
+    -- Input Box
+    consoleInput = Instance.new("TextBox")
+    consoleInput.Name = "Input"
+    consoleInput.Size = UDim2.new(1, -10, 0, 30)
+    consoleInput.Position = UDim2.new(0, 5, 1, -35)
+    consoleInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    consoleInput.BorderSizePixel = 0
+    consoleInput.Text = ""
+    consoleInput.PlaceholderText = "Enter command..."
+    consoleInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    consoleInput.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+    consoleInput.TextSize = 14
+    consoleInput.Font = Enum.Font.SourceSans
+    consoleInput.TextXAlignment = Enum.TextXAlignment.Left
+    consoleInput.ClearTextOnFocus = false
+    consoleInput.Parent = consoleFrame
+    
+    consoleInput.FocusLost:Connect(function(enterPressed)
+        if enterPressed and consoleInput.Text ~= "" then
+            Console.AddLog("> " .. consoleInput.Text, Color3.fromRGB(100, 200, 255))
+            pcall(function()
+                local func, err = loadstring(consoleInput.Text)
+                if func then
+                    local success, result = pcall(func)
+                    if success then
+                        Console.AddLog(tostring(result), Color3.fromRGB(0, 255, 0))
+                    else
+                        Console.AddLog("Error: " .. tostring(result), Color3.fromRGB(255, 0, 0))
+                    end
+                else
+                    Console.AddLog("Syntax Error: " .. tostring(err), Color3.fromRGB(255, 0, 0))
+                end
+            end)
+            consoleInput.Text = ""
+        end
+    end)
+    
+    Console.AddLog("Console initialized", Color3.fromRGB(0, 255, 0))
+    consoleEnabled = true
+end
+
+function Console.AddLog(text, color)
+    if not consoleOutput then return end
+    
+    local logLabel = Instance.new("TextLabel")
+    logLabel.Size = UDim2.new(1, -10, 0, 20)
+    logLabel.BackgroundTransparency = 1
+    logLabel.Text = "[" .. os.date("%H:%M:%S") .. "] " .. text
+    logLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    logLabel.TextSize = 12
+    logLabel.Font = Enum.Font.SourceSans
+    logLabel.TextXAlignment = Enum.TextXAlignment.Left
+    logLabel.TextWrapped = true
+    logLabel.TextYAlignment = Enum.TextYAlignment.Top
+    logLabel.Parent = consoleOutput
+    
+    -- Auto-resize based on text
+    local textBounds = game:GetService("TextService"):GetTextSize(
+        logLabel.Text,
+        logLabel.TextSize,
+        logLabel.Font,
+        Vector2.new(logLabel.AbsoluteSize.X, math.huge)
+    )
+    logLabel.Size = UDim2.new(1, -10, 0, math.max(20, textBounds.Y))
+end
+
+function Console.Clear()
+    if not consoleOutput then return end
+    for _, child in pairs(consoleOutput:GetChildren()) do
+        if child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+end
+
+function Console.Destroy()
+    if consoleGui then
+        consoleGui:Destroy()
+        consoleGui = nil
+        consoleFrame = nil
+        consoleOutput = nil
+        consoleInput = nil
+        consoleEnabled = false
+    end
+end
+
+function Console.IsEnabled()
+    return consoleEnabled
+end
+
+-- Hook into game logs
+local LogService = game:GetService("LogService")
+local ScriptContext = game:GetService("ScriptContext")
+
+LogService.MessageOut:Connect(function(message, messageType)
+    if not consoleEnabled then return end
+    
+    local color = Color3.fromRGB(255, 255, 255)
+    if messageType == Enum.MessageType.MessageError then
+        color = Color3.fromRGB(255, 0, 0)
+    elseif messageType == Enum.MessageType.MessageWarning then
+        color = Color3.fromRGB(255, 255, 0)
+    elseif messageType == Enum.MessageType.MessageInfo then
+        color = Color3.fromRGB(0, 200, 255)
+    end
+    
+    Console.AddLog(message, color)
 end)
 
-if not Console then
-    print("[YBA Enhanced] Консоль не загружена - файл не найден")
-    -- Создаем заглушку
-    Console = {
-        Create = function() print("[Console] Консоль недоступна") end,
-        Destroy = function() end,
-        IsEnabled = function() return false end
-    }
-end
+ScriptContext.Error:Connect(function(message, stack, script)
+    if not consoleEnabled then return end
+    Console.AddLog("ERROR: " .. message, Color3.fromRGB(255, 0, 0))
+    if stack and stack ~= "" then
+        Console.AddLog("Stack: " .. stack, Color3.fromRGB(200, 100, 100))
+    end
+end)
+
+print("[YBA Enhanced] Консоль встроена и готова к использованию")
 
 local consoleEnabled = false
 
