@@ -1224,7 +1224,7 @@ end
 
 -- Cheater Detection System
 local playerPositions = {}
-local cheaterDetections = {}
+local cheaterDetections = {}  -- {userId = {count = число, lastWarning = время}}
 local detectedCheatersCount = 0
 local cheaterDetectionEnabled = false
 local detectedCheaters = {}  -- НОВОЕ: Список обнаруженных читеров
@@ -1241,6 +1241,31 @@ local function StartCheaterDetection()
         Content = "Система обнаружения читеров активирована",
         Duration = 3
     })
+    
+    -- НОВОЕ: Поток для очистки старых варнингов (каждые 10 секунд)
+    task.spawn(function()
+        while cheaterDetectionEnabled and Settings.AutoServerHop do
+            local currentTime = tick()
+            local warningTimeout = 60  -- 60 секунд без нарушений = сброс варнингов
+            
+            for userId, data in pairs(cheaterDetections) do
+                if data.lastWarning and (currentTime - data.lastWarning) >= warningTimeout then
+                    -- Прошло 60 секунд без новых нарушений - сбрасываем варнинги
+                    local oldCount = data.count or 0
+                    cheaterDetections[userId] = nil
+                    
+                    if Settings.DebugMode and oldCount > 0 then
+                        local player = Players:GetPlayerByUserId(userId)
+                        if player then
+                            print("[Cheater Detection] Варнинги сброшены для " .. player.Name .. " (было: " .. oldCount .. ")")
+                        end
+                    end
+                end
+            end
+            
+            task.wait(10)  -- Проверяем каждые 10 секунд
+        end
+    end)
     
     task.spawn(function()
         while cheaterDetectionEnabled and Settings.AutoServerHop do
@@ -1302,9 +1327,17 @@ local function StartCheaterDetection()
                             local speed = distance / timeDiff
                             
                             if speed > 400 then -- 400+ studs/sec = явный телепорт
-                                cheaterDetections[player.UserId] = (cheaterDetections[player.UserId] or 0) + 1
+                                -- ИСПРАВЛЕНО: Инициализируем структуру данных если её нет
+                                if not cheaterDetections[player.UserId] then
+                                    cheaterDetections[player.UserId] = {count = 0, lastWarning = currentTime}
+                                end
                                 
-                                if cheaterDetections[player.UserId] >= Settings.CheaterDetectionSensitivity then
+                                cheaterDetections[player.UserId].count = cheaterDetections[player.UserId].count + 1
+                                cheaterDetections[player.UserId].lastWarning = currentTime  -- Обновляем время последнего нарушения
+                                
+                                local warningCount = cheaterDetections[player.UserId].count
+                                
+                                if warningCount >= Settings.CheaterDetectionSensitivity then
                                     detectedCheatersCount = detectedCheatersCount + 1
                                     
                                     -- НОВОЕ: Добавляем в список читеров
@@ -1316,7 +1349,7 @@ local function StartCheaterDetection()
                                         Duration = 5
                                     })
                                     
-                                    cheaterDetections[player.UserId] = 0
+                                    cheaterDetections[player.UserId].count = 0  -- Сбрасываем счетчик после подтверждения
                                     
                                     if detectedCheatersCount >= 3 then
                                         Library:Notify({
@@ -1329,6 +1362,8 @@ local function StartCheaterDetection()
                                         ServerHop()
                                         return
                                     end
+                                elseif Settings.DebugMode then
+                                    print("[Cheater Detection] " .. player.Name .. " подозрителен (" .. warningCount .. "/" .. Settings.CheaterDetectionSensitivity .. ") - скорость: " .. math.floor(speed) .. " стадов/сек")
                                 end
                             end
                         end
@@ -4760,19 +4795,41 @@ DebugTab:AddButton({
     Callback = function()
         local status = cheaterDetectionEnabled and "Активен" or "Неактивен"
         local cheaterCount = 0
-        for _, count in pairs(cheaterDetections) do
+        local suspiciousCount = 0
+        
+        -- ИСПРАВЛЕНО: Подсчитываем подтвержденных читеров и подозрительных
+        for userId, _ in pairs(detectedCheaters) do
             cheaterCount = cheaterCount + 1
+        end
+        
+        for userId, data in pairs(cheaterDetections) do
+            if data.count and data.count > 0 then
+                suspiciousCount = suspiciousCount + 1
+            end
         end
         
         Library:Notify({
             Title = "Детектор читеров",
-            Content = "Статус: " .. status .. "\nОбнаружено: " .. detectedCheatersCount .. "/3\nПодозрительных: " .. cheaterCount,
+            Content = "Статус: " .. status .. "\nПодтверждено: " .. detectedCheatersCount .. "/3\nПодозрительных: " .. suspiciousCount,
             Duration = 5
         })
         print("[DEBUG] Детектор читеров: " .. status)
         print("[DEBUG] Обнаружено читеров: " .. detectedCheatersCount .. "/3")
-        print("[DEBUG] Подозрительных игроков: " .. cheaterCount)
+        print("[DEBUG] Подозрительных игроков: " .. suspiciousCount)
         print("[DEBUG] Чувствительность: " .. Settings.CheaterDetectionSensitivity)
+        
+        -- НОВОЕ: Выводим детали по каждому подозрительному
+        if suspiciousCount > 0 then
+            print("[DEBUG] === Подозрительные игроки ===")
+            for userId, data in pairs(cheaterDetections) do
+                if data.count and data.count > 0 then
+                    local player = Players:GetPlayerByUserId(userId)
+                    local playerName = player and player.Name or "Unknown"
+                    local timeSinceWarning = data.lastWarning and math.floor(tick() - data.lastWarning) or 0
+                    print("[DEBUG]   " .. playerName .. ": " .. data.count .. "/" .. Settings.CheaterDetectionSensitivity .. " варнингов (последний: " .. timeSinceWarning .. "с назад)")
+                end
+            end
+        end
     end
 })
 
