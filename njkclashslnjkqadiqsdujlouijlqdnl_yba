@@ -3604,26 +3604,24 @@ function Console.Create()
         Console.Destroy()
     end)
     
-    -- Output ScrollingFrame
-    consoleOutput = Instance.new("ScrollingFrame")
+    -- Output TextBox (SELECTABLE)
+    consoleOutput = Instance.new("TextBox")
     consoleOutput.Name = "Output"
     consoleOutput.Size = UDim2.new(1, -10, 1, -75)
     consoleOutput.Position = UDim2.new(0, 5, 0, 35)
     consoleOutput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     consoleOutput.BorderSizePixel = 0
-    consoleOutput.ScrollBarThickness = 6
-    consoleOutput.CanvasSize = UDim2.new(0, 0, 0, 0)
+    consoleOutput.Text = ""
+    consoleOutput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    consoleOutput.TextSize = 12
+    consoleOutput.Font = Enum.Font.SourceSans
+    consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
+    consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
+    consoleOutput.TextWrapped = true
+    consoleOutput.MultiLine = true
+    consoleOutput.ClearTextOnFocus = false
+    consoleOutput.TextEditable = false
     consoleOutput.Parent = consoleFrame
-    
-    local outputList = Instance.new("UIListLayout")
-    outputList.SortOrder = Enum.SortOrder.LayoutOrder
-    outputList.Padding = UDim.new(0, 2)
-    outputList.Parent = consoleOutput
-    
-    outputList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        consoleOutput.CanvasSize = UDim2.new(0, 0, 0, outputList.AbsoluteContentSize.Y + 10)
-        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.CanvasSize.Y.Offset)
-    end)
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3669,35 +3667,21 @@ end
 function Console.AddLog(text, color)
     if not consoleOutput then return end
     
-    local logLabel = Instance.new("TextLabel")
-    logLabel.Size = UDim2.new(1, -10, 0, 20)
-    logLabel.BackgroundTransparency = 1
-    logLabel.Text = "[" .. os.date("%H:%M:%S") .. "] " .. text
-    logLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-    logLabel.TextSize = 12
-    logLabel.Font = Enum.Font.SourceSans
-    logLabel.TextXAlignment = Enum.TextXAlignment.Left
-    logLabel.TextWrapped = true
-    logLabel.TextYAlignment = Enum.TextYAlignment.Top
-    logLabel.Parent = consoleOutput
+    local timestamp = "[" .. os.date("%H:%M:%S") .. "] "
+    local newLine = timestamp .. text .. "\n"
     
-    -- Auto-resize based on text
-    local textBounds = game:GetService("TextService"):GetTextSize(
-        logLabel.Text,
-        logLabel.TextSize,
-        logLabel.Font,
-        Vector2.new(logLabel.AbsoluteSize.X, math.huge)
-    )
-    logLabel.Size = UDim2.new(1, -10, 0, math.max(20, textBounds.Y))
+    consoleOutput.Text = consoleOutput.Text .. newLine
+    
+    -- Auto-scroll to bottom
+    task.spawn(function()
+        task.wait(0.01)
+        consoleOutput.CursorPosition = #consoleOutput.Text
+    end)
 end
 
 function Console.Clear()
     if not consoleOutput then return end
-    for _, child in pairs(consoleOutput:GetChildren()) do
-        if child:IsA("TextLabel") then
-            child:Destroy()
-        end
-    end
+    consoleOutput.Text = ""
 end
 
 function Console.Destroy()
