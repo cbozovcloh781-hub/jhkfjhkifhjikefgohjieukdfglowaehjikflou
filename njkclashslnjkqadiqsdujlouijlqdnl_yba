@@ -62,6 +62,12 @@ task.spawn(function()
                 _G.YBASellItems[item] = true
             end
             
+            -- КРИТИЧНО: Применяем к Settings ТОЖЕ
+            Settings.Autofarm = forceConfig.autofarm
+            Settings.Autosell = forceConfig.autosell
+            Settings.FarmItems = _G.YBAFarmItems
+            Settings.SellItems = _G.YBASellItems
+            
             print("[YBA Enhanced] Конфиг применен:")
             print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
             print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
@@ -775,6 +781,10 @@ local function SaveConfigToServer()
         })
         
         print("[YBA Enhanced] Конфиг сохранен на сервер")
+        print("[YBA Enhanced]   Autofarm: " .. tostring(config.autofarm))
+        print("[YBA Enhanced]   Autosell: " .. tostring(config.autosell))
+        print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(config.farm_items))
+        print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(config.sell_items))
     end)
 end
 
@@ -1742,21 +1752,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 4%)
+    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 13%)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 35.36
-        stepDelay = 0.02688
+        stepSize = 38.42
+        stepDelay = 0.02494
     elseif distance < 300 then
-        stepSize = 39.52
-        stepDelay = 0.02496
+        stepSize = 42.98
+        stepDelay = 0.02376
     elseif distance < 600 then
-        stepSize = 41.6
-        stepDelay = 0.02304
+        stepSize = 45.26
+        stepDelay = 0.02138
     else
-        stepSize = 43.68
-        stepDelay = 0.02112
+        stepSize = 47.54
+        stepDelay = 0.01959
     end
     
     local direction = (targetPos - startPos).Unit
@@ -3454,10 +3464,10 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
 -- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
 task.spawn(function()
     task.wait(0.5)  -- Ждем создания Options
-    if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil and Options and Options.FarmItems then
-        Settings.FarmItems = _G.YBAFarmItems  -- ВАЖНО: Обновляем Settings!
-        Options.FarmItems:SetValue(_G.YBAFarmItems)
-        print("[YBA Enhanced] FarmItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
+    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options and Options.SellItems then
+        Settings.SellItems = _G.YBASellItems  -- ВАЖНО: Обновляем Settings!
+        Options.SellItems:SetValue(_G.YBASellItems)
+        print("[YBA Enhanced] SellItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
     end
 end)
 
