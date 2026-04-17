@@ -454,16 +454,20 @@ task.spawn(function()
         -- Ждем загрузки UI
         task.wait(3)  -- УВЕЛИЧЕНА задержка с 2 до 3 секунд
         
-        -- КРИТИЧНО: Ждем создания Options
+        -- Ждем создания Options
         local maxWait = 10
         local waited = 0
-        while (not Options.Autofarm or not Options.Autosell) and waited < maxWait do
+        while waited < maxWait do
+            if Options and Options.Autofarm and Options.Autosell then
+                print("[YBA Enhanced] Options созданы успешно!")
+                break
+            end
             task.wait(0.5)
             waited = waited + 0.5
             print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
         end
         
-        if not Options.Autofarm or not Options.Autosell then
+        if not Options or not Options.Autofarm or not Options.Autosell then
             print("[YBA Enhanced] ОШИБКА: Options не созданы за " .. maxWait .. " секунд!")
         end
         
@@ -3981,7 +3985,7 @@ function Console.Create()
 end
 
 function Console.AddLog(text, color)
-    if not consoleOutput then return end
+    if not consoleOutput or not consoleOutput.Parent then return end
     
     local timestamp = "[" .. os.date("%H:%M:%S") .. "] "
     
