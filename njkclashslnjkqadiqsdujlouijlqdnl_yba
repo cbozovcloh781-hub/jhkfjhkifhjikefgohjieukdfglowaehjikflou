@@ -2382,6 +2382,74 @@ local function StartCommandHandler()
                     lucky_arrows = luckyArrows,
                     lucky_masks = luckyMasks,
                     current_account = game.Players.LocalPlayer.Name,
+                    items_collected_delta = itemsCollectedDelta,
+                    items_sold_delta = itemsSoldDelta,
+                    money_collected_delta = moneyCollectedDelta,
+                    money_sold_delta = moneySoldDelta,
+                    money_needed = moneyNeeded,
+                    time_to_million = timeToMillion,
+                    items_to_million = itemsToMillion,
+                    hours_to_million = hoursToMillion,
+                    minutes_to_million = minutesToMillion
+                }
+                
+                local HttpService = game:GetService("HttpService")
+                request({
+                    Url = "http://localhost:5000/api/stats",
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(statsData)
+                })
+            end)
+            
+            if not success then
+                warn("[Command Handler] Ошибка отправки статистики: " .. tostring(err))
+            end
+            
+            task.wait(5)
+        end
+    end)
+    
+    task.spawn(function()
+        while commandHandlerEnabled do
+            local success, result = pcall(function()
+                local response = request({
+                    Url = "http://localhost:5000/api/command",
+                    Method = "GET"
+                })
+                
+                if response.StatusCode == 200 then
+                    local HttpService = game:GetService("HttpService")
+                    local data = HttpService:JSONDecode(response.Body)
+                    
+                    if data.command then
+                        local cmdResult = HandleCommand(data.command)
+                        print("[Command Handler] Команда: " .. data.command .. ", Результат: " .. cmdResult.message)
+                    end
+                end
+            end)
+            
+            if not success then
+                warn("[Command Handler] Ошибка получения команды: " .. tostring(result))
+            end
+            
+            task.wait(1)
+        end
+    end)
+end
+
+local function StopCommandHandler()
+    commandHandlerEnabled = false
+    print("[YBA Enhanced] Обработчик команд остановлен")
+end
+
+farmStats.prevItemsCollected = 0
+farmStats.prevItemsSold = 0
+farmStats.prevMoneyCollected = 0
+farmStats.prevMoneySold = 0
+
+StartCommandHandler()
+print("[YBA Enhanced] Скрипт загружен успешно!")
                     server_hops = farmStats.serverHops,  -- НОВОЕ: Количество свапов
                     -- НОВОЕ: Прогноз
                     money_needed = moneyNeeded,
