@@ -37,6 +37,19 @@ task.spawn(function()
         end
     end)
     
+    -- КРИТИЧНО: Ждем исчезновения LoadingScreen1 ПЕРЕД нажатием Play
+    print("[YBA Enhanced] Ожидание исчезновения LoadingScreen1...")
+    local loadingScreen1WaitTime = 0
+    while loadingScreen1WaitTime < 30 do
+        local loadingScreen1 = playerGui:FindFirstChild("LoadingScreen1")
+        if not loadingScreen1 then
+            print("[YBA Enhanced] LoadingScreen1 исчез!")
+            break
+        end
+        task.wait(0.5)
+        loadingScreen1WaitTime = loadingScreen1WaitTime + 0.5
+    end
+    
     -- Ждем появления LoadingScreen
     local loadingScreen = playerGui:WaitForChild("LoadingScreen", 30)
     
@@ -2167,20 +2180,12 @@ local function StartAutosell()
                         _G.YBAItemsSold = farmStats.itemsSold
                         _G.YBAMoneySold = farmStats.moneySold
                         
-                        print("[Autosell] Продан " .. itemName .. " за $" .. itemPrice .. " (баланс: $" .. (currentMoney + itemPrice) .. ")")
-                        print("[Autosell] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
+                        -- УБРАНО: Спам логов в консоль
                     end
                     task.wait(0.05)
                 end
                 
-                if itemsSold > 0 then
-                    local newBalance = GetPlayerMoney()
-                    Library:Notify({
-                        Title = "Продано",
-                        Content = itemsSold .. " предметов (баланс: $" .. newBalance .. ")",
-                        Duration = 2
-                    })
-                end
+                -- УБРАНО: Уведомление после каждой продажи (спам)
             end
             
             task.wait(0.5)
@@ -3661,24 +3666,14 @@ function Console.Create()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = consoleFrame
     
-    -- Output TextBox (SELECTABLE)
-    consoleOutput = Instance.new("TextBox")
-    consoleOutput.Name = "Output"
-    consoleOutput.Size = UDim2.new(1, -8, 1, 0)
-    consoleOutput.Position = UDim2.new(0, 0, 0, 0)
-    consoleOutput.BackgroundTransparency = 1
-    consoleOutput.BorderSizePixel = 0
-    consoleOutput.Text = ""
-    consoleOutput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    consoleOutput.TextSize = 12
-    consoleOutput.Font = Enum.Font.SourceSans
-    consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
-    consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
-    consoleOutput.TextWrapped = true
-    consoleOutput.MultiLine = true
-    consoleOutput.ClearTextOnFocus = false
-    consoleOutput.TextEditable = false
-    consoleOutput.Parent = scrollFrame
+    -- UIListLayout для автоматического расположения логов
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Parent = scrollFrame
+    
+    -- Сохраняем scrollFrame для доступа
+    consoleOutput = scrollFrame
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3725,40 +3720,102 @@ function Console.AddLog(text, color)
     if not consoleOutput then return end
     
     local timestamp = "[" .. os.date("%H:%M:%S") .. "] "
-    local newLine = timestamp .. text .. "\n"
     
-    consoleOutput.Text = consoleOutput.Text .. newLine
+    -- Определяем цвет по типу сообщения
+    local logColor = color or Color3.fromRGB(255, 255, 255)
+    local bgColor = Color3.fromRGB(45, 45, 45)
     
-    -- Обновляем размер Canvas для скроллинга
-    task.spawn(function()
-        task.wait(0.01)
-        local textService = game:GetService("TextService")
-        local textBounds = textService:GetTextSize(
-            consoleOutput.Text,
-            consoleOutput.TextSize,
-            consoleOutput.Font,
-            Vector2.new(consoleOutput.AbsoluteSize.X, math.huge)
-        )
-        
-        local scrollFrame = consoleOutput.Parent
-        if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 10)
-            -- Auto-scroll to bottom
-            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
+    -- Автоматическое определение цвета по ключевым словам
+    if not color then
+        if text:find("ERROR") or text:find("Error") or text:find("error") or text:find("ОШИБКА") or text:find("Ошибка") then
+            logColor = Color3.fromRGB(255, 80, 80)
+            bgColor = Color3.fromRGB(60, 30, 30)
+        elseif text:find("WARNING") or text:find("Warning") or text:find("ВНИМАНИЕ") or text:find("Предупреждение") then
+            logColor = Color3.fromRGB(255, 200, 80)
+            bgColor = Color3.fromRGB(60, 50, 30)
+        elseif text:find("SUCCESS") or text:find("Success") or text:find("УСПЕХ") or text:find("Успешно") then
+            logColor = Color3.fromRGB(80, 255, 120)
+            bgColor = Color3.fromRGB(30, 60, 35)
+        elseif text:find("INFO") or text:find("Info") or text:find("ИНФО") then
+            logColor = Color3.fromRGB(100, 200, 255)
+            bgColor = Color3.fromRGB(30, 45, 60)
+        elseif text:find("DEBUG") or text:find("Debug") or text:find("ДЕБАГ") then
+            logColor = Color3.fromRGB(200, 150, 255)
+            bgColor = Color3.fromRGB(45, 35, 60)
+        elseif text:find("[YBA Enhanced]") or text:find("[Autofarm]") or text:find("[Autosell]") then
+            logColor = Color3.fromRGB(150, 255, 200)
+            bgColor = Color3.fromRGB(30, 50, 40)
         end
+    end
+    
+    -- Создаем Frame для каждого лога
+    local logFrame = Instance.new("Frame")
+    logFrame.Name = "LogEntry"
+    logFrame.Size = UDim2.new(1, -8, 0, 0)
+    logFrame.BackgroundColor3 = bgColor
+    logFrame.BorderSizePixel = 0
+    logFrame.AutomaticSize = Enum.AutomaticSize.Y
+    logFrame.Parent = consoleOutput
+    
+    -- Padding для текста
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 5)
+    padding.PaddingRight = UDim.new(0, 5)
+    padding.PaddingTop = UDim.new(0, 3)
+    padding.PaddingBottom = UDim.new(0, 3)
+    padding.Parent = logFrame
+    
+    -- TextLabel для timestamp
+    local timestampLabel = Instance.new("TextLabel")
+    timestampLabel.Name = "Timestamp"
+    timestampLabel.Size = UDim2.new(0, 70, 0, 14)
+    timestampLabel.Position = UDim2.new(0, 0, 0, 0)
+    timestampLabel.BackgroundTransparency = 1
+    timestampLabel.Text = timestamp
+    timestampLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    timestampLabel.TextSize = 11
+    timestampLabel.Font = Enum.Font.SourceSans
+    timestampLabel.TextXAlignment = Enum.TextXAlignment.Left
+    timestampLabel.Parent = logFrame
+    
+    -- TextBox для текста (чтобы можно было копировать)
+    local textBox = Instance.new("TextBox")
+    textBox.Name = "LogText"
+    textBox.Size = UDim2.new(1, -75, 1, 0)
+    textBox.Position = UDim2.new(0, 75, 0, 0)
+    textBox.BackgroundTransparency = 1
+    textBox.Text = text
+    textBox.TextColor3 = logColor
+    textBox.TextSize = 12
+    textBox.Font = Enum.Font.SourceSans
+    textBox.TextXAlignment = Enum.TextXAlignment.Left
+    textBox.TextYAlignment = Enum.TextYAlignment.Top
+    textBox.TextWrapped = true
+    textBox.MultiLine = true
+    textBox.ClearTextOnFocus = false
+    textBox.TextEditable = false
+    textBox.AutomaticSize = Enum.AutomaticSize.Y
+    textBox.Parent = logFrame
+    
+    -- Auto-scroll to bottom
+    task.spawn(function()
+        task.wait(0.05)
+        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.AbsoluteCanvasSize.Y)
     end)
 end
 
 function Console.Clear()
     if not consoleOutput then return end
-    consoleOutput.Text = ""
     
-    -- Сбрасываем размер Canvas
-    local scrollFrame = consoleOutput.Parent
-    if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-        scrollFrame.CanvasPosition = Vector2.new(0, 0)
+    -- Удаляем все логи
+    for _, child in pairs(consoleOutput:GetChildren()) do
+        if child:IsA("Frame") and child.Name == "LogEntry" then
+            child:Destroy()
+        end
     end
+    
+    -- Сбрасываем позицию скролла
+    consoleOutput.CanvasPosition = Vector2.new(0, 0)
 end
 
 function Console.Destroy()
