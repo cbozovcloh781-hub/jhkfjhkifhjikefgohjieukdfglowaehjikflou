@@ -35,47 +35,6 @@ task.spawn(function()
         return
     end
     
-    -- НОВОЕ: Загружаем конфиг с сервера ПЕРЕД всем остальным
-    local forceConfig = nil
-    pcall(function()
-        local HttpService = game:GetService("HttpService")
-        local response = request({
-            Url = "http://localhost:5000/api/config",
-            Method = "GET"
-        })
-        
-        if response and response.StatusCode == 200 then
-            forceConfig = HttpService:JSONDecode(response.Body)
-            print("[YBA Enhanced] Конфиг загружен с сервера: " .. HttpService:JSONEncode(forceConfig))
-            
-            -- Применяем конфиг
-            _G.YBAAutoFarmEnabled = forceConfig.autofarm
-            _G.YBAAutoSellEnabled = forceConfig.autosell
-            _G.YBAFarmItems = {}
-            _G.YBASellItems = {}
-            
-            -- Конвертируем массивы в таблицы
-            for _, item in ipairs(forceConfig.farm_items or {}) do
-                _G.YBAFarmItems[item] = true
-            end
-            for _, item in ipairs(forceConfig.sell_items or {}) do
-                _G.YBASellItems[item] = true
-            end
-            
-            -- КРИТИЧНО: Применяем к Settings ТОЖЕ (ДО создания UI!)
-            Settings.Autofarm = forceConfig.autofarm
-            Settings.Autosell = forceConfig.autosell
-            Settings.FarmItems = _G.YBAFarmItems
-            Settings.SellItems = _G.YBASellItems
-            
-            print("[YBA Enhanced] Конфиг применен:")
-            print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-            print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
-            print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(_G.YBAFarmItems))
-            print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(_G.YBASellItems))
-        end
-    end)
-    
     -- НОВОЕ: Проверяем престиж ПЕРЕД всем остальным (с повторной проверкой)
     local prestige = 0
     local prestigeCheckAttempts = 0
@@ -929,7 +888,8 @@ end
 -- КРИТИЧНО: Инициализируем Settings перед загрузкой
 Settings = table.clone(DefaultSettings)
 
--- КРИТИЧНО: Загружаем конфиг с сервера ПЕРЕД loadSettings()
+-- КРИТИЧНО: СНАЧАЛА пытаемся загрузить конфиг с сервера
+local serverConfigLoaded = false
 pcall(function()
     local HttpService = game:GetService("HttpService")
     local response = request({
@@ -939,7 +899,7 @@ pcall(function()
     
     if response and response.StatusCode == 200 then
         local serverConfig = HttpService:JSONDecode(response.Body)
-        print("[YBA Enhanced] Конфиг загружен с сервера (ПЕРЕД loadSettings): " .. HttpService:JSONEncode(serverConfig))
+        print("[YBA Enhanced] Конфиг загружен с сервера: " .. HttpService:JSONEncode(serverConfig))
         
         -- Применяем конфиг к Settings
         Settings.Autofarm = serverConfig.autofarm
@@ -954,6 +914,14 @@ pcall(function()
             Settings.SellItems[item] = true
         end
         
+        -- Обновляем _G тоже
+        _G.YBAAutoFarmEnabled = serverConfig.autofarm
+        _G.YBAAutoSellEnabled = serverConfig.autosell
+        _G.YBAFarmItems = Settings.FarmItems
+        _G.YBASellItems = Settings.SellItems
+        
+        serverConfigLoaded = true
+        
         print("[YBA Enhanced] Settings обновлены из серверного конфига:")
         print("[YBA Enhanced]   Autofarm: " .. tostring(Settings.Autofarm))
         print("[YBA Enhanced]   Autosell: " .. tostring(Settings.Autosell))
@@ -962,7 +930,13 @@ pcall(function()
     end
 end)
 
-loadSettings()
+-- КРИТИЧНО: Загружаем локальный файл ТОЛЬКО если серверный конфиг НЕ загрузился
+if not serverConfigLoaded then
+    print("[YBA Enhanced] Серверный конфиг не загрузился, используем локальный файл")
+    loadSettings()
+else
+    print("[YBA Enhanced] Серверный конфиг загрузился успешно, локальный файл ИГНОРИРУЕТСЯ")
+end
 
 -- КРИТИЧНО: Инициализируем _G переменные при старте скрипта
 if _G.YBAAutoFarmEnabled == nil then
@@ -3600,6 +3574,9 @@ Options.Autofarm = AutoTab:AddToggle("Autofarm", {
     end
 })
 
+-- Флаг для предотвращения автосохранения при программной установке
+local isSettingDropdownProgrammatically = false
+
 Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     Title = "📦 Предметы для сбора",
     Description = "Выбери какие предметы собирать",
@@ -3607,13 +3584,39 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     Multi = true,
     Default = Settings.FarmItems,
     Callback = function(Value)
+        if isSettingDropdownProgrammatically then
+            print("[YBA Enhanced] FarmItems Callback пропущен (программная установка)")
+            return
+        end
         Settings.FarmItems = Value
         saveSettings()
         SaveConfigToServer()  -- Сохраняем на сервер
         _G.YBAFarmItems = Value
-        print("[YBA Enhanced] FarmItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
+        print("[YBA Enhanced] FarmItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
+
+-- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
+if Settings.FarmItems and next(Settings.FarmItems) ~= nil then
+    print("[YBA Enhanced] Принудительная установка FarmItems через SetValue()...")
+    isSettingDropdownProgrammatically = true
+    Options.FarmItems:SetValue(Settings.FarmItems)
+    task.wait(0.1)
+    isSettingDropdownProgrammatically = false
+    -- Проверяем что .Value установился
+    if not Options.FarmItems.Value or not next(Options.FarmItems.Value) then
+        print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
+        Options.FarmItems.Value = Settings.FarmItems
+    end
+end
+
+print("[YBA Enhanced] === ДРОПДАУН FarmItems СОЗДАН ===")
+print("[YBA Enhanced] Options.FarmItems существует: " .. tostring(Options.FarmItems ~= nil))
+if Options.FarmItems then
+    print("[YBA Enhanced] Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value or {}))
+end
+print("[YBA Enhanced] Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems or {}))
+print("[YBA Enhanced] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems or {}))
 
 Options.Autosell = AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
@@ -3642,16 +3645,47 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     Multi = true,
     Default = Settings.SellItems,
     Callback = function(Value)
+        if isSettingDropdownProgrammatically then
+            print("[YBA Enhanced] SellItems Callback пропущен (программная установка)")
+            return
+        end
         Settings.SellItems = Value
         saveSettings()
         SaveConfigToServer()  -- Сохраняем на сервер
         _G.YBASellItems = Value
-        print("[YBA Enhanced] SellItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
+        print("[YBA Enhanced] SellItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
 
+-- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
+if Settings.SellItems and next(Settings.SellItems) ~= nil then
+    print("[YBA Enhanced] Принудительная установка SellItems через SetValue()...")
+    isSettingDropdownProgrammatically = true
+    Options.SellItems:SetValue(Settings.SellItems)
+    task.wait(0.1)
+    isSettingDropdownProgrammatically = false
+    -- Проверяем что .Value установился
+    if not Options.SellItems.Value or not next(Options.SellItems.Value) then
+        print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
+        Options.SellItems.Value = Settings.SellItems
+    end
+end
+
+print("[YBA Enhanced] === ДРОПДАУН SellItems СОЗДАН ===")
+print("[YBA Enhanced] Options.SellItems существует: " .. tostring(Options.SellItems ~= nil))
+if Options.SellItems then
+    print("[YBA Enhanced] Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value or {}))
+end
+print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
+print("[YBA Enhanced] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems or {}))
+
 -- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (СРАЗУ ПОСЛЕ создания обоих дропдаунов)
-print("[YBA Enhanced] Восстановление дропдаунов из _G...")
+print("[YBA Enhanced] === НАЧАЛО ВОССТАНОВЛЕНИЯ ДРОПДАУНОВ ===")
+print("[YBA Enhanced] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems or {}))
+print("[YBA Enhanced] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems or {}))
+print("[YBA Enhanced] Options.FarmItems существует: " .. tostring(Options.FarmItems ~= nil))
+print("[YBA Enhanced] Options.SellItems существует: " .. tostring(Options.SellItems ~= nil))
+
 if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
     print("[YBA Enhanced] Восстановление FarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
     Options.FarmItems:SetValue(_G.YBAFarmItems)
@@ -3670,6 +3704,8 @@ if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
         StartAutofarm()
         print("[YBA Enhanced] Автофарм перезапущен успешно")
     end
+else
+    print("[YBA Enhanced] _G.YBAFarmItems пустой или не существует, пропускаем восстановление")
 end
 
 if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
@@ -3690,6 +3726,8 @@ if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
         StartAutosell()
         print("[YBA Enhanced] Автоселл перезапущен успешно")
     end
+else
+    print("[YBA Enhanced] _G.YBASellItems пустой или не существует, пропускаем восстановление")
 end
 
 -- === СТАТИСТИКА ===
