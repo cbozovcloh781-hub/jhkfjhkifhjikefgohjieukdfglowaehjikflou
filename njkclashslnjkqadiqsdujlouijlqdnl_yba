@@ -62,7 +62,7 @@ task.spawn(function()
                 _G.YBASellItems[item] = true
             end
             
-            -- КРИТИЧНО: Применяем к Settings ТОЖЕ
+            -- КРИТИЧНО: Применяем к Settings ТОЖЕ (ДО создания UI!)
             Settings.Autofarm = forceConfig.autofarm
             Settings.Autosell = forceConfig.autosell
             Settings.FarmItems = _G.YBAFarmItems
@@ -928,6 +928,39 @@ end
 
 -- КРИТИЧНО: Инициализируем Settings перед загрузкой
 Settings = table.clone(DefaultSettings)
+
+-- КРИТИЧНО: Загружаем конфиг с сервера ПЕРЕД loadSettings()
+pcall(function()
+    local HttpService = game:GetService("HttpService")
+    local response = request({
+        Url = "http://localhost:5000/api/config",
+        Method = "GET"
+    })
+    
+    if response and response.StatusCode == 200 then
+        local serverConfig = HttpService:JSONDecode(response.Body)
+        print("[YBA Enhanced] Конфиг загружен с сервера (ПЕРЕД loadSettings): " .. HttpService:JSONEncode(serverConfig))
+        
+        -- Применяем конфиг к Settings
+        Settings.Autofarm = serverConfig.autofarm
+        Settings.Autosell = serverConfig.autosell
+        Settings.FarmItems = {}
+        Settings.SellItems = {}
+        
+        for _, item in ipairs(serverConfig.farm_items or {}) do
+            Settings.FarmItems[item] = true
+        end
+        for _, item in ipairs(serverConfig.sell_items or {}) do
+            Settings.SellItems[item] = true
+        end
+        
+        print("[YBA Enhanced] Settings обновлены из серверного конфига:")
+        print("[YBA Enhanced]   Autofarm: " .. tostring(Settings.Autofarm))
+        print("[YBA Enhanced]   Autosell: " .. tostring(Settings.Autosell))
+        print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(Settings.FarmItems))
+        print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(Settings.SellItems))
+    end
+end)
 
 loadSettings()
 
