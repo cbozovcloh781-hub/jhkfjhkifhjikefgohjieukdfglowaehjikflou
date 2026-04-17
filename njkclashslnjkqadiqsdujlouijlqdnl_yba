@@ -2219,6 +2219,9 @@ local function ExecuteCommand(command, args)
         task.wait(1)
         loadstring(game:HttpGet("https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"))()
         return {success = true, message = "Скрипт перезапускается..."}
+    elseif command == "server_hop" then
+        ServerHop()
+        return {success = true, message = "Смена сервера..."}
     elseif command == "get_stats" then
         local money = GetPlayerMoney()
         local uptime = math.floor(tick() - farmStats.startTime)
