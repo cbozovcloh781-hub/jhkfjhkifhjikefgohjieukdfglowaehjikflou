@@ -3590,7 +3590,7 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
         end
         Settings.FarmItems = Value
         saveSettings()
-        SaveConfigToServer()  -- Сохраняем на сервер
+        SaveConfigToServer()  -- Сохраняем на сервер ТОЛЬКО при ручном изменении
         _G.YBAFarmItems = Value
         print("[YBA Enhanced] FarmItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
@@ -3599,15 +3599,19 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
 -- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
 if Settings.FarmItems and next(Settings.FarmItems) ~= nil then
     print("[YBA Enhanced] Принудительная установка FarmItems через SetValue()...")
+    print("[YBA Enhanced] Settings.FarmItems ДО SetValue: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
     isSettingDropdownProgrammatically = true
     Options.FarmItems:SetValue(Settings.FarmItems)
     task.wait(0.1)
-    isSettingDropdownProgrammatically = false
     -- Проверяем что .Value установился
     if not Options.FarmItems.Value or not next(Options.FarmItems.Value) then
         print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
         Options.FarmItems.Value = Settings.FarmItems
     end
+    isSettingDropdownProgrammatically = false
+    print("[YBA Enhanced] Options.FarmItems.Value ПОСЛЕ SetValue: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value or {}))
+else
+    print("[YBA Enhanced] Settings.FarmItems пустой, пропускаем SetValue")
 end
 
 print("[YBA Enhanced] === ДРОПДАУН FarmItems СОЗДАН ===")
@@ -3660,15 +3664,19 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
 -- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
 if Settings.SellItems and next(Settings.SellItems) ~= nil then
     print("[YBA Enhanced] Принудительная установка SellItems через SetValue()...")
+    print("[YBA Enhanced] Settings.SellItems ДО SetValue: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
     isSettingDropdownProgrammatically = true
     Options.SellItems:SetValue(Settings.SellItems)
     task.wait(0.1)
-    isSettingDropdownProgrammatically = false
     -- Проверяем что .Value установился
     if not Options.SellItems.Value or not next(Options.SellItems.Value) then
         print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
         Options.SellItems.Value = Settings.SellItems
     end
+    isSettingDropdownProgrammatically = false
+    print("[YBA Enhanced] Options.SellItems.Value ПОСЛЕ SetValue: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value or {}))
+else
+    print("[YBA Enhanced] Settings.SellItems пустой, пропускаем SetValue")
 end
 
 print("[YBA Enhanced] === ДРОПДАУН SellItems СОЗДАН ===")
