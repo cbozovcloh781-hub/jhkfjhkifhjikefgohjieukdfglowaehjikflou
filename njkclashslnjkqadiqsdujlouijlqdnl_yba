@@ -335,25 +335,49 @@ task.spawn(function()
         local savedSellItems = _G.YBASellItems
         
         if Options.FarmItems and savedFarmItems then
-            -- КРИТИЧНО: SetValue вызывает Callback который ПЕРЕЗАПИСЫВАЕТ Settings!
+            print("[YBA Enhanced] Восстановление FarmItems в UI...")
+            
+            -- КРИТИЧНО: SetValue НЕ вызывает Callback для дропдаунов!
             Options.FarmItems:SetValue(savedFarmItems)
-            print("[YBA Enhanced] FarmItems установлены в UI")
-            -- ИСПРАВЛЕНО: Восстанавливаем Settings ПОСЛЕ SetValue
-            task.wait(0.1)
+            
+            -- ИСПРАВЛЕНО: Принудительно обновляем Options.FarmItems.Value
+            task.wait(0.2)
+            if Options.FarmItems.Value then
+                print("[YBA Enhanced] Options.FarmItems.Value ДО: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
+            end
+            
+            -- КРИТИЧНО: Принудительно устанавливаем .Value
+            Options.FarmItems.Value = savedFarmItems
             Settings.FarmItems = savedFarmItems
-            print("[YBA Enhanced] Settings.FarmItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+            _G.YBAFarmItems = savedFarmItems
+            
+            print("[YBA Enhanced] FarmItems восстановлены:")
+            print("[YBA Enhanced]   Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
+            print("[YBA Enhanced]   Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.FarmItems не найден!")
         end
         
         if Options.SellItems and savedSellItems then
-            -- КРИТИЧНО: SetValue вызывает Callback который ПЕРЕЗАПИСЫВАЕТ Settings!
+            print("[YBA Enhanced] Восстановление SellItems в UI...")
+            
+            -- КРИТИЧНО: SetValue НЕ вызывает Callback для дропдаунов!
             Options.SellItems:SetValue(savedSellItems)
-            print("[YBA Enhanced] SellItems установлены в UI")
-            -- ИСПРАВЛЕНО: Восстанавливаем Settings ПОСЛЕ SetValue
-            task.wait(0.1)
+            
+            -- ИСПРАВЛЕНО: Принудительно обновляем Options.SellItems.Value
+            task.wait(0.2)
+            if Options.SellItems.Value then
+                print("[YBA Enhanced] Options.SellItems.Value ДО: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
+            end
+            
+            -- КРИТИЧНО: Принудительно устанавливаем .Value
+            Options.SellItems.Value = savedSellItems
             Settings.SellItems = savedSellItems
-            print("[YBA Enhanced] Settings.SellItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+            _G.YBASellItems = savedSellItems
+            
+            print("[YBA Enhanced] SellItems восстановлены:")
+            print("[YBA Enhanced]   Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
+            print("[YBA Enhanced]   Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.SellItems не найден!")
         end
