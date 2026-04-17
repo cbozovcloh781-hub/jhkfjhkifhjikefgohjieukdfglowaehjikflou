@@ -889,30 +889,34 @@ if _G.YBASellItems ~= nil then
     print("[YBA Enhanced] Восстановлено SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
 end
 
--- КРИТИЧНО: Восстанавливаем счетчики из _G если они есть
+-- ИСПРАВЛЕНО: Восстанавливаем счетчики из _G если они есть
 if _G.YBAItemsCollected then
     farmStats.itemsCollected = _G.YBAItemsCollected
-    farmStats.prevItemsCollected = _G.YBAItemsCollected  -- НОВОЕ: Инициализируем предыдущее значение
+    farmStats.prevItemsCollected = _G.YBAItemsCollected
     print("[YBA Enhanced] Восстановлено itemsCollected: " .. farmStats.itemsCollected)
 end
 if _G.YBAMoneyCollected then
     farmStats.moneyCollected = _G.YBAMoneyCollected
-    farmStats.prevMoneyCollected = _G.YBAMoneyCollected  -- НОВОЕ: Инициализируем предыдущее значение
+    farmStats.prevMoneyCollected = _G.YBAMoneyCollected
     print("[YBA Enhanced] Восстановлено moneyCollected: " .. farmStats.moneyCollected)
 end
 if _G.YBAItemsSold then
     farmStats.itemsSold = _G.YBAItemsSold
-    farmStats.prevItemsSold = _G.YBAItemsSold  -- НОВОЕ: Инициализируем предыдущее значение
+    farmStats.prevItemsSold = _G.YBAItemsSold
     print("[YBA Enhanced] Восстановлено itemsSold: " .. farmStats.itemsSold)
 end
 if _G.YBAMoneySold then
     farmStats.moneySold = _G.YBAMoneySold
-    farmStats.prevMoneySold = _G.YBAMoneySold  -- НОВОЕ: Инициализируем предыдущее значение
+    farmStats.prevMoneySold = _G.YBAMoneySold
     print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
 end
 if _G.YBAServerHops then
     farmStats.serverHops = _G.YBAServerHops
     print("[YBA Enhanced] Восстановлено serverHops: " .. farmStats.serverHops)
+else
+    -- ИСПРАВЛЕНО: Инициализируем serverHops если его нет
+    farmStats.serverHops = 0
+    print("[YBA Enhanced] serverHops инициализирован: 0")
 end
 if _G.YBAStartTime then
     farmStats.startTime = _G.YBAStartTime
@@ -1752,21 +1756,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 13%)
+    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 9%)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 38.42
-        stepDelay = 0.02494
+        stepSize = 36.54
+        stepDelay = 0.02622
     elseif distance < 300 then
-        stepSize = 42.98
-        stepDelay = 0.02376
+        stepSize = 40.86
+        stepDelay = 0.02436
     elseif distance < 600 then
-        stepSize = 45.26
-        stepDelay = 0.02138
+        stepSize = 43.02
+        stepDelay = 0.02247
     else
-        stepSize = 47.54
-        stepDelay = 0.01959
+        stepSize = 45.18
+        stepDelay = 0.02059
     end
     
     local direction = (targetPos - startPos).Unit
@@ -2809,10 +2813,11 @@ local function StartCommandHandler()
     end)
 end
 
-farmStats.prevItemsCollected = 0
-farmStats.prevItemsSold = 0
-farmStats.prevMoneyCollected = 0
-farmStats.prevMoneySold = 0
+-- ИСПРАВЛЕНО: НЕ сбрасываем prevItems при старте, они уже инициализированы из _G
+-- farmStats.prevItemsCollected = 0
+-- farmStats.prevItemsSold = 0
+-- farmStats.prevMoneyCollected = 0
+-- farmStats.prevMoneySold = 0
 
 StartCommandHandler()
 print("[YBA Enhanced] Скрипт загружен успешно!")
