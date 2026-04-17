@@ -3753,22 +3753,28 @@ function Console.Create()
     copyBtn.Parent = titleBar
     
     copyBtn.MouseButton1Click:Connect(function()
-        -- Удаляем все RichText теги
-        local plainText = consoleOutput.Text:gsub("<[^>]+>", "")
-        -- Декодируем HTML сущности
-        plainText = plainText:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&")
+        -- Копируем чистый текст из невидимого TextBox
+        local plainText = plainTextStorage.Text
         
         -- Копируем в буфер обмена
-        pcall(function()
+        local success = pcall(function()
             setclipboard(plainText)
         end)
         
-        -- Визуальная обратная связь
-        copyBtn.Text = "Copied!"
-        copyBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
-        task.wait(1)
-        copyBtn.Text = "Copy"
-        copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+        if success then
+            -- Визуальная обратная связь
+            copyBtn.Text = "Copied!"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
+            task.wait(1)
+            copyBtn.Text = "Copy"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+        else
+            copyBtn.Text = "Error!"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+            task.wait(1)
+            copyBtn.Text = "Copy"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+        end
     end)
     
     -- НОВОЕ: Кнопка очистки
@@ -3801,10 +3807,10 @@ function Console.Create()
     scrollFrame.Active = true
     scrollFrame.Parent = consoleFrame
     
-    -- Output TextBox (SELECTABLE + SCROLLABLE)
-    consoleOutput = Instance.new("TextBox")
+    -- Output TextLabel (READ-ONLY, БЕЗ БАГА С ТЕГАМИ)
+    consoleOutput = Instance.new("TextLabel")
     consoleOutput.Name = "Output"
-    consoleOutput.Size = UDim2.new(1, -10, 1, 0)  -- ИСПРАВЛЕНО: Убрана AutomaticSize
+    consoleOutput.Size = UDim2.new(1, -10, 1, 0)
     consoleOutput.Position = UDim2.new(0, 0, 0, 0)
     consoleOutput.BackgroundTransparency = 1
     consoleOutput.BorderSizePixel = 0
@@ -3816,10 +3822,14 @@ function Console.Create()
     consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
     consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
     consoleOutput.TextWrapped = true
-    consoleOutput.MultiLine = true
-    consoleOutput.ClearTextOnFocus = false
-    consoleOutput.TextEditable = false
     consoleOutput.Parent = scrollFrame
+    
+    -- НОВОЕ: Невидимый TextBox для хранения чистого текста (без RichText)
+    local plainTextStorage = Instance.new("TextBox")
+    plainTextStorage.Name = "PlainTextStorage"
+    plainTextStorage.Visible = false
+    plainTextStorage.Text = ""
+    plainTextStorage.Parent = consoleFrame
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3907,6 +3917,12 @@ function Console.AddLog(text, color)
     local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
     consoleOutput.Text = consoleOutput.Text .. coloredText
     
+    -- НОВОЕ: Добавляем чистый текст в невидимый TextBox
+    local plainTextStorage = consoleFrame:FindFirstChild("PlainTextStorage")
+    if plainTextStorage then
+        plainTextStorage.Text = plainTextStorage.Text .. timestamp .. text .. "\n"
+    end
+    
     -- КРИТИЧНО: Обновляем CanvasSize ТОЛЬКО если пользователь НЕ взаимодействует с консолью
     task.spawn(function()
         task.wait(0.1)  -- УВЕЛИЧЕНА задержка с 0.05 до 0.1
@@ -3914,8 +3930,8 @@ function Console.AddLog(text, color)
         
         local scrollFrame = consoleOutput.Parent
         if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
-            -- НОВОЕ: Проверяем фокус на TextBox (пользователь выделяет текст)
-            local userInteracting = consoleOutput:IsFocused() or game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            -- НОВОЕ: Проверяем фокус на скролле (пользователь скроллит)
+            local userInteracting = game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
             
             if not userInteracting then
                 -- ИСПРАВЛЕНО: Рассчитываем высоту текста вручную
@@ -3949,6 +3965,12 @@ end
 function Console.Clear()
     if not consoleOutput then return end
     consoleOutput.Text = ""
+    
+    -- Очищаем чистый текст
+    local plainTextStorage = consoleFrame:FindFirstChild("PlainTextStorage")
+    if plainTextStorage then
+        plainTextStorage.Text = ""
+    end
     
     -- Сбрасываем позицию скролла
     local scrollFrame = consoleOutput.Parent
