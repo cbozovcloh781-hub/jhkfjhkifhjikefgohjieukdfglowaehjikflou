@@ -3582,16 +3582,6 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     end
 })
 
--- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
-task.spawn(function()
-    task.wait(0.5)  -- Ждем создания Options
-    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options and Options.SellItems then
-        Settings.SellItems = _G.YBASellItems  -- ВАЖНО: Обновляем Settings!
-        Options.SellItems:SetValue(_G.YBASellItems)
-        print("[YBA Enhanced] SellItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
-    end
-end)
-
 Options.Autosell = AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
     Description = "Автоматически продает выбранные предметы (лимит $1M)",
@@ -3627,15 +3617,47 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     end
 })
 
--- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
-task.spawn(function()
-    task.wait(0.5)  -- Ждем создания Options
-    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options and Options.SellItems then
-        Settings.SellItems = _G.YBASellItems  -- ВАЖНО: Обновляем Settings!
-        Options.SellItems:SetValue(_G.YBASellItems)
-        print("[YBA Enhanced] SellItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
+-- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (СРАЗУ ПОСЛЕ создания обоих дропдаунов)
+print("[YBA Enhanced] Восстановление дропдаунов из _G...")
+if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
+    print("[YBA Enhanced] Восстановление FarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
+    Options.FarmItems:SetValue(_G.YBAFarmItems)
+    task.wait(0.2)
+    Options.FarmItems.Value = _G.YBAFarmItems
+    Settings.FarmItems = _G.YBAFarmItems
+    print("[YBA Enhanced] FarmItems восстановлены в UI")
+    print("[YBA Enhanced]   Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
+    print("[YBA Enhanced]   Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+    
+    -- КРИТИЧНО: Если автофарм был активен - перезапускаем его
+    if _G.YBAAutoFarmEnabled and isAutofarmEnabled then
+        print("[YBA Enhanced] Перезапуск автофарма после восстановления дропдауна...")
+        StopAutofarm()
+        task.wait(0.5)
+        StartAutofarm()
+        print("[YBA Enhanced] Автофарм перезапущен успешно")
     end
-end)
+end
+
+if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
+    print("[YBA Enhanced] Восстановление SellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
+    Options.SellItems:SetValue(_G.YBASellItems)
+    task.wait(0.2)
+    Options.SellItems.Value = _G.YBASellItems
+    Settings.SellItems = _G.YBASellItems
+    print("[YBA Enhanced] SellItems восстановлены в UI")
+    print("[YBA Enhanced]   Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
+    print("[YBA Enhanced]   Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+    
+    -- КРИТИЧНО: Если автоселл был активен - перезапускаем его
+    if _G.YBAAutoSellEnabled and isAutosellEnabled then
+        print("[YBA Enhanced] Перезапуск автоселла после восстановления дропдауна...")
+        StopAutosell()
+        task.wait(0.5)
+        StartAutosell()
+        print("[YBA Enhanced] Автоселл перезапущен успешно")
+    end
+end
 
 -- === СТАТИСТИКА ===
 AutoTab:AddButton({
