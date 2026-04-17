@@ -2393,16 +2393,6 @@ local function StartCommandHandler()
                     hours_to_million = hoursToMillion,
                     minutes_to_million = minutesToMillion
                 }
-                    items_collected_delta = itemsCollectedDelta,
-                    items_sold_delta = itemsSoldDelta,
-                    money_collected_delta = moneyCollectedDelta,
-                    money_sold_delta = moneySoldDelta,
-                    money_needed = moneyNeeded,
-                    time_to_million = timeToMillion,
-                    items_to_million = itemsToMillion,
-                    hours_to_million = hoursToMillion,
-                    minutes_to_million = minutesToMillion
-                }
                 
                 local HttpService = game:GetService("HttpService")
                 request({
@@ -2449,11 +2439,6 @@ local function StartCommandHandler()
     end)
 end
 
-local function StopCommandHandler()
-    commandHandlerEnabled = false
-    print("[YBA Enhanced] Обработчик команд остановлен")
-end
-
 farmStats.prevItemsCollected = 0
 farmStats.prevItemsSold = 0
 farmStats.prevMoneyCollected = 0
@@ -2461,77 +2446,6 @@ farmStats.prevMoneySold = 0
 
 StartCommandHandler()
 print("[YBA Enhanced] Скрипт загружен успешно!")
-                    server_hops = farmStats.serverHops,  -- НОВОЕ: Количество свапов
-                    -- НОВОЕ: Прогноз
-                    money_needed = moneyNeeded,
-                    time_to_million_seconds = timeToMillion,
-                    time_to_million_hours = hoursToMillion,
-                    time_to_million_minutes = minutesToMillion,
-                    items_to_million = itemsToMillion,
-                    money_per_hour = uptime > 0 and farmStats.moneySold and math.floor((farmStats.moneySold / uptime) * 3600) or 0,
-                    items_per_hour = uptime > 0 and farmStats.itemsSold and math.floor((farmStats.itemsSold / uptime) * 3600) or 0,
-                    -- НОВОЕ: Прибавка с предыдущей отправки
-                    items_collected_delta = itemsCollectedDelta,
-                    items_sold_delta = itemsSoldDelta,
-                    money_collected_delta = moneyCollectedDelta,
-                    money_sold_delta = moneySoldDelta
-                }
-                
-                -- Отправляем статистику на сервер
-                local HttpService = game:GetService("HttpService")
-                local response = request({
-                    Url = "http://localhost:5000/api/stats",
-                    Method = "POST",
-                    Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode(statsData)
-                })
-                
-                if response.StatusCode == 200 then
-                    print("[Command Handler] Статистика обновлена: $" .. money .. " | Собрано: " .. farmStats.itemsCollected .. " | Продано: " .. farmStats.itemsSold)
-                else
-                    print("[Command Handler] Ошибка отправки: " .. response.StatusCode)
-                end
-            end)
-            
-            if not success then
-                print("[Command Handler] Ошибка отправки статистики: " .. tostring(err))
-            end
-            
-            task.wait(5)  -- Отправляем каждые 5 секунд
-        end
-    end)
-    
-    task.spawn(function()
-        while commandHandlerEnabled do
-            local success, response = pcall(function()
-                return request({
-                    Url = "http://localhost:5000/api/commands",
-                    Method = "GET"
-                })
-            end)
-            
-            if success and response and response.StatusCode == 200 then
-                local data = game:GetService("HttpService"):JSONDecode(response.Body)
-                
-                if data.commands and #data.commands > 0 then
-                    for _, cmd in ipairs(data.commands) do
-                        print("[YBA Enhanced] Получена команда: " .. cmd.command)
-                        local result = ExecuteCommand(cmd.command, cmd.args or {})
-                        print("[YBA Enhanced] Результат: " .. (result.message or "OK"))
-                    end
-                end
-            end
-            
-            task.wait(2)
-        end
-    end)
-end
-
-local function StopCommandHandler()
-    if not commandHandlerEnabled then return end
-    commandHandlerEnabled = false
-    print("[YBA Enhanced] Обработчик команд остановлен")
-end
 
 -- Autobuy Functions
 local function BuyLuckyArrow()
