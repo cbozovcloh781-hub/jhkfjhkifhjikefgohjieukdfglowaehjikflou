@@ -3662,14 +3662,16 @@ function Console.Create()
     scrollFrame.Position = UDim2.new(0, 5, 0, 35)
     scrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     scrollFrame.BorderSizePixel = 0
-    scrollFrame.ScrollBarThickness = 8
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.ScrollBarThickness = 10
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 2, 0)  -- КРИТИЧНО: Начальный размер больше чем Frame
+    scrollFrame.ScrollingEnabled = true
+    scrollFrame.Active = true
     scrollFrame.Parent = consoleFrame
     
-    -- Output TextLabel с RichText (SELECTABLE)
-    consoleOutput = Instance.new("TextLabel")
+    -- Output TextBox (SELECTABLE + SCROLLABLE)
+    consoleOutput = Instance.new("TextBox")
     consoleOutput.Name = "Output"
-    consoleOutput.Size = UDim2.new(1, -8, 1, 0)
+    consoleOutput.Size = UDim2.new(1, -10, 1, 0)
     consoleOutput.Position = UDim2.new(0, 0, 0, 0)
     consoleOutput.BackgroundTransparency = 1
     consoleOutput.BorderSizePixel = 0
@@ -3681,6 +3683,9 @@ function Console.Create()
     consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
     consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
     consoleOutput.TextWrapped = true
+    consoleOutput.MultiLine = true
+    consoleOutput.ClearTextOnFocus = false
+    consoleOutput.TextEditable = false
     consoleOutput.AutomaticSize = Enum.AutomaticSize.Y
     consoleOutput.Parent = scrollFrame
     
@@ -3761,12 +3766,15 @@ function Console.AddLog(text, color)
     local coloredText = '<font color="#969696">' .. timestamp .. '</font><font color="' .. colorHex .. '">' .. text .. '</font>\n'
     consoleOutput.Text = consoleOutput.Text .. coloredText
     
-    -- Auto-scroll to bottom
+    -- КРИТИЧНО: Обновляем CanvasSize после добавления текста
     task.spawn(function()
         task.wait(0.05)
         local scrollFrame = consoleOutput.Parent
         if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
-            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+            -- Устанавливаем CanvasSize равным высоте TextBox
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, consoleOutput.AbsoluteSize.Y + 20)
+            -- Auto-scroll to bottom
+            scrollFrame.CanvasPosition = Vector2.new(0, consoleOutput.AbsoluteSize.Y)
         end
     end)
 end
