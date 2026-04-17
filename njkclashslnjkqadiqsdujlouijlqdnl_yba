@@ -136,24 +136,8 @@ task.spawn(function()
             end)
         end
         
-        -- Метод 3: Отключаем LoadingScreen если долго не получается
-        if attempt > 30 then
-            pcall(function()
-                loadingScreen.Enabled = false
-                print("[YBA Enhanced] Попытка " .. attempt .. ": Отключен LoadingScreen.Enabled")
-            end)
-        end
-        
-        -- Метод 4: Удаляем LoadingScreen если совсем не получается
-        if attempt > 40 then
-            pcall(function()
-                loadingScreen:Destroy()
-                print("[YBA Enhanced] Попытка " .. attempt .. ": LoadingScreen удален")
-            end)
-        end
-        
-        -- Проверяем исчез ли LoadingScreen
-        if not loadingScreen or not loadingScreen.Parent or not loadingScreen.Enabled then
+        -- Проверяем исчез ли LoadingScreen (БЕЗ УДАЛЕНИЯ!)
+        if not loadingScreen or not loadingScreen.Parent then
             print("[YBA Enhanced] LoadingScreen закрылся! Кнопка сработала.")
             success = true
             break
@@ -164,26 +148,19 @@ task.spawn(function()
     
     if not success then
         print("[YBA Enhanced] Не удалось нажать кнопку Play за 50 попыток")
-        print("[YBA Enhanced] Принудительное удаление LoadingScreen...")
-        pcall(function()
-            if loadingScreen then
-                loadingScreen:Destroy()
-                print("[YBA Enhanced] LoadingScreen удален принудительно!")
-            end
-        end)
+        print("[YBA Enhanced] LoadingScreen НЕ удаляется - ждем ручного нажатия")
     end
     
     -- КРИТИЧНО: После успешного нажатия кнопки Play запускаем автофарм
     print("[YBA Enhanced] Ожидание полной загрузки игры...")
     task.wait(3)  -- Ждем полной загрузки игры
     
-    -- ДИАГНОСТИКА: Проверяем _G переменные
+    -- ДИАГНОСТИКА: Проверяем _G переменные (БЕЗОПАСНО)
     print("[YBA Enhanced] === ДИАГНОСТИКА _G ПЕРЕМЕННЫХ ===")
     print("[YBA Enhanced] _G.YBAAutoRestart = " .. tostring(_G.YBAAutoRestart))
     print("[YBA Enhanced] _G.YBAAutoFarmEnabled = " .. tostring(_G.YBAAutoFarmEnabled))
     print("[YBA Enhanced] _G.YBAAutoSellEnabled = " .. tostring(_G.YBAAutoSellEnabled))
-    print("[YBA Enhanced] Settings.Autofarm = " .. tostring(Settings.Autofarm))
-    print("[YBA Enhanced] Settings.Autosell = " .. tostring(Settings.Autosell))
+    -- Settings еще не инициализирован на этом этапе, пропускаем
     print("[YBA Enhanced] =============================================")
     
     -- Проверяем флаг автозапуска
