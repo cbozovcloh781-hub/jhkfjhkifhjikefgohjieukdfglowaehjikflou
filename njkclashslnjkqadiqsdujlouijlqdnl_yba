@@ -3838,27 +3838,6 @@ function Console.Create()
     miniConsole.Visible = false
     miniConsole.Parent = consoleGui
     
-    -- КРИТИЧНО: Делаем Frame драгабельным через UIDragDetector
-    local dragDetector = Instance.new("UIDragDetector")
-    dragDetector.Parent = miniConsole
-    dragDetector.DragStyle = Enum.UIDragDetectorDragStyle.TranslatePlane
-    dragDetector.ResponseType = Enum.UIDragDetectorResponseType.Custom
-    
-    dragDetector.DragStart:Connect(function()
-        miniConsole.BorderColor3 = Color3.fromRGB(255, 255, 0)
-    end)
-    
-    dragDetector.DragEnd:Connect(function()
-        miniConsole.BorderColor3 = Color3.fromRGB(255, 165, 0)
-    end)
-    
-    dragDetector:GetPropertyChangedSignal("WorldPosition"):Connect(function()
-        local worldPos = dragDetector.WorldPosition
-        if worldPos then
-            miniConsole.Position = UDim2.new(0, worldPos.X, 0, worldPos.Y)
-        end
-    end)
-    
     local miniLabel = Instance.new("TextLabel")
     miniLabel.Name = "Label"
     miniLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -3869,14 +3848,20 @@ function Console.Create()
     miniLabel.Font = Enum.Font.SourceSansBold
     miniLabel.Parent = miniConsole
     
-    -- Делаем мини-консоль кликабельной
+    -- Делаем мини-консоль кликабельной И драгабельной
     local miniBtn = Instance.new("TextButton")
     miniBtn.Name = "ClickArea"
     miniBtn.Size = UDim2.new(1, 0, 1, 0)
     miniBtn.BackgroundTransparency = 1
     miniBtn.Text = ""
-    miniBtn.ZIndex = 2
+    miniBtn.Active = true
+    miniBtn.Draggable = true  -- КРИТИЧНО: Драг через кнопку
     miniBtn.Parent = miniConsole
+    
+    -- КРИТИЧНО: Синхронизируем позицию Frame с кнопкой
+    miniBtn:GetPropertyChangedSignal("Position"):Connect(function()
+        miniConsole.Position = miniBtn.Position
+    end)
     
     -- Логика сворачивания/разворачивания
     minimizeBtn.MouseButton1Click:Connect(function()
@@ -3937,7 +3922,8 @@ function Console.Create()
     coloredDisplay.TextXAlignment = Enum.TextXAlignment.Left
     coloredDisplay.TextYAlignment = Enum.TextYAlignment.Top
     coloredDisplay.TextWrapped = true
-    coloredDisplay.ZIndex = 2  -- Поверх TextBox
+    coloredDisplay.ZIndex = 1  -- ПОД TextBox чтобы не блокировать выделение
+    coloredDisplay.Active = false  -- Не блокирует клики
     coloredDisplay.Parent = scrollFrame
     
     -- КРИТИЧНО: Делаем coloredDisplay прозрачным для кликов (чтобы можно было выделять текст в TextBox)
