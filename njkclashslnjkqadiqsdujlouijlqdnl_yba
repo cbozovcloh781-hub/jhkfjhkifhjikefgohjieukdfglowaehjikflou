@@ -491,6 +491,9 @@ local DefaultSettings = {
     -- Console
     CustomConsole = false,
     
+    -- Debug
+    DebugMode = false,
+    
     -- Money Farm
     MoneyFarmEnabled = false,
     MoneyLimit = 1000000,
@@ -862,6 +865,47 @@ local function StartCheaterDetection()
     
     task.spawn(function()
         while cheaterDetectionEnabled and Settings.AutoServerHop do
+            -- НОВОЕ: Проверка на AFK фармеров возле крана
+            local craneBox = nil
+            pcall(function()
+                craneBox = workspace.Map.Prison.Prison_Props.Prison_Crane2.Prison_Crane1_CraneBox
+            end)
+            
+            if craneBox then
+                local afkFarmersCount = 0
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local distance = (player.Character.HumanoidRootPart.Position - craneBox.Position).Magnitude
+                        
+                        -- Если игрок ближе 20 стадов к крану = AFK фармер
+                        if distance < 20 then
+                            afkFarmersCount = afkFarmersCount + 1
+                            
+                            if Settings.DebugMode then
+                                print("[Cheater Detection] AFK фармер обнаружен: " .. player.Name .. " (расстояние: " .. math.floor(distance) .. " стадов)")
+                            end
+                        end
+                    end
+                end
+                
+                -- Если 2+ AFK фармеров = свапаем сервер
+                if afkFarmersCount >= 2 then
+                    Library:Notify({
+                        Title = "Свап сервера",
+                        Content = "Обнаружено " .. afkFarmersCount .. " AFK фармеров! Смена сервера через 3 секунды...",
+                        Duration = 3
+                    })
+                    
+                    if Settings.DebugMode then
+                        print("[Cheater Detection] Обнаружено " .. afkFarmersCount .. " AFK фармеров возле крана. Свап сервера...")
+                    end
+                    
+                    task.wait(3)
+                    ServerHop()
+                    return
+                end
+            end
+            
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                     local currentPos = player.Character.HumanoidRootPart.Position
@@ -1504,7 +1548,11 @@ local function FindNearestItem()
     local character = Player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
     
-    local selectedItems = Options.FarmItems and Options.FarmItems.Value or Settings.FarmItems
+    -- БЕЗОПАСНО: Проверяем что Options существует
+    local selectedItems = Settings.FarmItems
+    if Options and Options.FarmItems and Options.FarmItems.Value then
+        selectedItems = Options.FarmItems.Value
+    end
     local playerPosition = character.HumanoidRootPart.Position
     local nearestPrompt = nil
     local nearestItem = nil
@@ -1920,7 +1968,11 @@ local function StartAutosell()
     
     task.spawn(function()
         while isAutosellEnabled do
-            local selectedItems = Options.SellItems and Options.SellItems.Value or Settings.SellItems
+            -- БЕЗОПАСНО: Проверяем что Options существует
+            local selectedItems = Settings.SellItems
+            if Options and Options.SellItems and Options.SellItems.Value then
+                selectedItems = Options.SellItems.Value
+            end
             
             if type(selectedItems) == "table" then
                 local itemsSold = 0
@@ -2405,8 +2457,10 @@ local function StartCommandHandler()
                     itemsToMillion = 0
                 end
                 
-                print("[Command Handler] Прогноз: Осталось $" .. moneyNeeded .. ", Время: " .. hoursToMillion .. "ч " .. minutesToMillion .. "м, Предметов: " .. itemsToMillion)
-                print("[Command Handler] Прибавка: Собрано +" .. itemsCollectedDelta .. " (+$" .. moneyCollectedDelta .. "), Продано +" .. itemsSoldDelta .. " (+$" .. moneySoldDelta .. ")")
+                if Settings.DebugMode then
+                    print("[Command Handler] Прогноз: Осталось $" .. moneyNeeded .. ", Время: " .. hoursToMillion .. "ч " .. minutesToMillion .. "м, Предметов: " .. itemsToMillion)
+                    print("[Command Handler] Прибавка: Собрано +" .. itemsCollectedDelta .. " (+$" .. moneyCollectedDelta .. "), Продано +" .. itemsSoldDelta .. " (+$" .. moneySoldDelta .. ")")
+                end
                 
                 local statsData = {
                     balance = money,
@@ -2445,7 +2499,9 @@ local function StartCommandHandler()
             end)
             
             if not success then
-                warn("[Command Handler] Ошибка отправки статистики: " .. tostring(err))
+                if Settings.DebugMode then
+                    warn("[Command Handler] Ошибка отправки статистики: " .. tostring(err))
+                end
             end
             
             task.wait(5)
@@ -2472,7 +2528,9 @@ local function StartCommandHandler()
             end)
             
             if not success then
-                warn("[Command Handler] Ошибка получения команды: " .. tostring(result))
+                if Settings.DebugMode then
+                    warn("[Command Handler] Ошибка получения команды: " .. tostring(result))
+                end
             end
             
             task.wait(1)
@@ -2564,26 +2622,15 @@ end
 
 -- ESP Functions
 local function CreateESP(player)
-    if not DrawingSupported then 
+    if not DrawingSupported or not Drawing then 
         return 
-    end
-    if not Drawing then
-        return
-    end
-    -- Additional safety check
-    local testSuccess = pcall(function() 
-        local test = Drawing.new("Line")
-        if test then test:Remove() end
-    end)
-    if not testSuccess then
-        return
     end
     if player == LocalPlayer then return end
     if Drawings.ESP[player] then RemoveESP(player) end
     
     local success, err = pcall(function()
         local box = {TopLeft = Drawing.new("Line"), TopRight = Drawing.new("Line"), BottomLeft = Drawing.new("Line"), BottomRight = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line"), Top = Drawing.new("Line"), Bottom = Drawing.new("Line")}
-        for _, line in pairs(box) do line.Visible = false line.Color = Colors.Enemy line.Thickness = ESPSettings.BoxThickness if line == box.Fill then line.Filled = true line.Transparency = ESPSettings.BoxFillTransparency end end
+        for _, line in pairs(box) do if line then line.Visible = false line.Color = Colors.Enemy line.Thickness = ESPSettings.BoxThickness if line == box.Fill then line.Filled = true line.Transparency = ESPSettings.BoxFillTransparency end end end
         
         local tracer = Drawing.new("Line") tracer.Visible = false tracer.Color = Colors.Enemy tracer.Thickness = ESPSettings.TracerThickness
         
@@ -3436,7 +3483,21 @@ TeleportTab:AddButton({
 })
 
 -- Загружаем DEX Console модуль
-local Console = loadstring(game:HttpGet("https://raw.githubusercontent.com/yourusername/yourrepo/main/console.lua"))() or loadfile("E:\\folders\\codes\\roblox\\games\\yba\\console.lua")()
+local Console = nil
+pcall(function()
+    -- Пробуем загрузить из файла
+    Console = loadfile("E:\\folders\\codes\\roblox\\games\\yba\\console.lua")()
+end)
+
+if not Console then
+    print("[YBA Enhanced] Консоль не загружена - файл не найден")
+    -- Создаем заглушку
+    Console = {
+        Create = function() print("[Console] Консоль недоступна") end,
+        Destroy = function() end,
+        IsEnabled = function() return false end
+    }
+end
 
 local consoleEnabled = false
 
@@ -3445,7 +3506,9 @@ local function StartConsole()
     consoleEnabled = true
     
     pcall(function()
-        Console.Create()
+        if Console and Console.Create then
+            Console.Create()
+        end
     end)
 end
 
@@ -3454,7 +3517,9 @@ local function StopConsole()
     consoleEnabled = false
     
     pcall(function()
-        Console.Destroy()
+        if Console and Console.Destroy then
+            Console.Destroy()
+        end
     end)
 end
 
@@ -3462,6 +3527,107 @@ end
 local SettingsTab = Window:AddTab({
     Title = "Settings",
     Icon = "settings"
+})
+
+SettingsTab:AddToggle("Platform", {
+    Title = "Farm Platform",
+    Description = "Create a platform for farming",
+    Default = Settings.Platform,
+    Callback = function(Value)
+        Settings.Platform = Value
+        saveSettings()
+        
+        if Value then
+            CreateFarmPlatform()
+        else
+            DestroyFarmPlatform()
+        end
+    end
+})
+
+SettingsTab:AddButton({
+    Title = "Teleport to Platform",
+    Description = "Teleport to farm platform",
+    Callback = function()
+        TeleportToPlatform()
+    end
+})
+
+SettingsTab:AddToggle("UnlockZoom", {
+    Title = "Unlock Zoom",
+    Description = "Remove camera zoom distance limit",
+    Default = Settings.UnlockZoom,
+    Callback = function(Value)
+        Settings.UnlockZoom = Value
+        saveSettings()
+        
+        if Value then
+            Player.CameraMaxZoomDistance = math.huge
+            Player.CameraMinZoomDistance = 0
+        else
+            Player.CameraMaxZoomDistance = 128
+            Player.CameraMinZoomDistance = 0.5
+        end
+    end
+})
+
+SettingsTab:AddToggle("CustomConsole", {
+    Title = "Custom Console",
+    Description = "Enable custom debug console (auto-opens on script start)",
+    Default = Settings.CustomConsole or false,
+    Callback = function(Value)
+        Settings.CustomConsole = Value
+        saveSettings()
+        
+        if Value then
+            StartConsole()
+        else
+            StopConsole()
+        end
+    end
+})
+
+SettingsTab:AddToggle("DebugMode", {
+    Title = "Debug Mode",
+    Description = "Показывать отладочную информацию в консоли",
+    Default = Settings.DebugMode or false,
+    Callback = function(Value)
+        Settings.DebugMode = Value
+        saveSettings()
+        
+        if Value then
+            Library:Notify({
+                Title = "Debug Mode",
+                Content = "Отладка включена! Статистика будет выводиться в консоль.",
+                Duration = 3
+            })
+        else
+            Library:Notify({
+                Title = "Debug Mode",
+                Content = "Отладка выключена.",
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- КРИТИЧНО: Автоматически открываем консоль при запуске если тумблер включен
+if Settings.CustomConsole then
+    task.spawn(function()
+        task.wait(1)
+        StartConsole()
+        print("[YBA Enhanced] Консоль открыта автоматически")
+    end)
+end
+
+SettingsTab:AddButton({
+    Title = "Destroy Script",
+    Description = "Completely remove the script",
+    Callback = function()
+        pcall(function()
+            DestroyAllFunctions()
+        end)
+    end
 })
 
 -- Test Tab
@@ -4390,58 +4556,36 @@ DebugTab:AddButton({
     end
 })
 
-SettingsTab:AddToggle("UnlockZoom", {
-    Title = "Unlock Zoom",
-    Description = "Remove camera zoom distance limit",
-    Default = Settings.UnlockZoom,
-    Callback = function(Value)
-        Settings.UnlockZoom = Value
-        saveSettings()
-        
-        if Value then
-            Player.CameraMaxZoomDistance = math.huge
-            Player.CameraMinZoomDistance = 0
-        else
-            Player.CameraMaxZoomDistance = 128
-            Player.CameraMinZoomDistance = 0.5
-        end
-    end
-})
+-- Save manager setup (КРИТИЧНО: ДОЛЖНО БЫТЬ ПОСЛЕ ВСЕХ НАСТРОЕК)
+SaveManager:SetLibrary(Library)
+InterfaceManager:SetLibrary(Library)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("YBAEnhanced")
+SaveManager:SetFolder("YBAEnhanced/configs")
 
-SettingsTab:AddToggle("CustomConsole", {
-    Title = "Custom Console",
-    Description = "Enable custom debug console (auto-opens on script start)",
-    Default = Settings.CustomConsole or false,
-    Callback = function(Value)
-        Settings.CustomConsole = Value
-        saveSettings()
-        
-        if Value then
-            StartConsole()
-        else
-            StopConsole()
-        end
-    end
-})
+InterfaceManager:BuildInterfaceSection(SettingsTab)
+SaveManager:BuildConfigSection(SettingsTab)
 
--- КРИТИЧНО: Автоматически открываем консоль при запуске если тумблер включен
-if Settings.CustomConsole then
-    task.spawn(function()
-        task.wait(1)
-        StartConsole()
-        print("[YBA Enhanced] Консоль открыта автоматически")
-    end)
+-- Load default config
+SaveManager:LoadAutoloadConfig()
+
+Window:SelectTab(1)
+
+if _G.YBAEnhancedReloaded then
+    Library:Notify({
+        Title = "YBA Enhanced",
+        Content = "Скрипт перезагружен успешно!",
+        Duration = 5
+    })
+    _G.YBAEnhancedReloaded = false
+else
+    Library:Notify({
+        Title = "YBA",
+        Content = "Script loaded successfully!",
+        Duration = 5
+    })
 end
-
-SettingsTab:AddButton({
-    Title = "Destroy Script",
-    Description = "Completely remove the script",
-    Callback = function()
-        pcall(function()
-            DestroyAllFunctions()
-        end)
-    end
-})
 
 -- Update player list periodically
 globalConnections.playerListUpdate = spawn(function()
