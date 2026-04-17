@@ -813,27 +813,70 @@ local function ServerHop()
     print("[YBA Enhanced]   Общее время работы: " .. totalUptime .. " секунд")
     print("[YBA Enhanced] =================================================")
     
-    -- НОВОЕ: Отправляем уведомление на сервер о свапе
+    -- КРИТИЧНО: Отправляем статистику НА СЕРВЕР ПЕРЕД СВАПОМ
     pcall(function()
+        local money = GetPlayerMoney()
+        local uptime = math.floor(tick() - farmStats.startTime)
+        
+        -- Подсчет инвентаря
+        local totalItems = 0
+        local sellableItems = 0
+        local sellableValue = 0
+        local luckyArrows = 0
+        local luckyMasks = 0
+        
+        for _, item in pairs(Player.Backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                totalItems = totalItems + 1
+                
+                if item.Name == "Lucky Arrow" then
+                    luckyArrows = luckyArrows + 1
+                elseif item.Name == "Lucky Stone Mask" then
+                    luckyMasks = luckyMasks + 1
+                end
+                
+                local itemPrice = itemPrices[item.Name] or 0
+                if itemPrice > 0 and item.Name ~= "Lucky Arrow" and item.Name ~= "Lucky Stone Mask" then
+                    sellableItems = sellableItems + 1
+                    sellableValue = sellableValue + itemPrice
+                end
+            end
+        end
+        
         local swapData = {
             action = "server_hop",
+            balance = money,
+            uptime = uptime,
             items_collected = _G.YBAItemsCollected,
-            money_collected = _G.YBAMoneyCollected,
             items_sold = _G.YBAItemsSold,
+            money_collected = _G.YBAMoneyCollected,
             money_sold = _G.YBAMoneySold,
             server_hops = _G.YBAServerHops,
             total_uptime = totalUptime,
-            current_account = game.Players.LocalPlayer.Name
+            current_account = game.Players.LocalPlayer.Name,
+            inventory_total = totalItems,
+            inventory_sellable = sellableItems,
+            inventory_sellable_value = sellableValue,
+            lucky_arrows = luckyArrows,
+            lucky_masks = luckyMasks,
+            autofarm_status = Settings.Autofarm,
+            autosell_status = Settings.Autosell
         }
         
-        request({
+        print("[YBA Enhanced] Отправка статистики перед свапом на http://localhost:5000/api/server_hop")
+        
+        local response = request({
             Url = "http://localhost:5000/api/server_hop",
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
             Body = HttpService:JSONEncode(swapData)
         })
         
-        print("[YBA Enhanced] Уведомление о свапе отправлено на сервер")
+        if response and response.StatusCode == 200 then
+            print("[YBA Enhanced] Статистика успешно отправлена на сервер (код: " .. response.StatusCode .. ")")
+        else
+            print("[YBA Enhanced] ОШИБКА отправки статистики: код " .. (response and response.StatusCode or "nil"))
+        end
     end)
     
     -- КРИТИЧНО: Используем queue_on_teleport для автозагрузки скрипта
@@ -1909,19 +1952,11 @@ local function StartAutofarm()
                         _G.YBAItemsCollected = farmStats.itemsCollected
                         _G.YBAMoneyCollected = farmStats.moneyCollected
                         
-                        print("[Autofarm] Собран: " .. itemName .. " ($" .. itemPrice .. ") | Всего: " .. farmStats.itemsCollected .. " предметов")
-                        print("[Autofarm] Статистика: Собрано $" .. farmStats.moneyCollected .. " | Продано $" .. farmStats.moneySold)
-                        
-                        Library:Notify({
-                            Title = "Предмет собран",
-                            Content = itemName .. " ($" .. itemPrice .. ") [" .. farmStats.itemsCollected .. " всего]",
-                            Duration = 2
-                        })
+                        -- УБРАНО: Спам логов и уведомлений
                         
                         task.wait(0.3)  -- 300мс задержка после успешного подбора
                     else
-                        -- Предмет НЕ подобрался
-                        print("[Autofarm] Не удалось подобрать " .. itemName .. " за 10 попыток")
+                        -- Предмет НЕ подобрался (без спама)
                         task.wait(0.5)  -- 500мс если не подобрали (больше задержка)
                     end
                 elseif not prompt and not item then
@@ -2190,8 +2225,6 @@ local function StartAutosell()
                         -- КРИТИЧНО: Сохраняем в _G для сохранения между сессиями
                         _G.YBAItemsSold = farmStats.itemsSold
                         _G.YBAMoneySold = farmStats.moneySold
-                        
-                        -- УБРАНО: Спам логов в консоль
                     end
                     task.wait(0.05)
                 end
@@ -2525,13 +2558,6 @@ local function StartCommandHandler()
                     end
                 end
                 
-                -- НОВОЕ: Расчет прогноза до $1,000,000
-                local moneyNeeded = math.max(0, 1000000 - money)
-                local timeToMillion = 0
-                local itemsToMillion = 0
-                local hoursToMillion = 0
-                local minutesToMillion = 0
-                
                 -- НОВОЕ: Вычисляем прибавку с предыдущей отправки
                 local itemsCollectedDelta = farmStats.itemsCollected - farmStats.prevItemsCollected
                 local itemsSoldDelta = farmStats.itemsSold - farmStats.prevItemsSold
@@ -2543,35 +2569,6 @@ local function StartCommandHandler()
                 farmStats.prevItemsSold = farmStats.itemsSold
                 farmStats.prevMoneyCollected = farmStats.moneyCollected
                 farmStats.prevMoneySold = farmStats.moneySold
-                
-                -- КРИТИЧНО: Прогноз работает только если есть данные (минимум 60 секунд работы)
-                if uptime >= 60 and farmStats.moneySold and farmStats.moneySold > 0 then
-                    -- Скорость фарма денег в секунду
-                    local moneyPerSecond = farmStats.moneySold / uptime
-                    
-                    if moneyPerSecond > 0 and moneyNeeded > 0 then
-                        timeToMillion = math.ceil(moneyNeeded / moneyPerSecond)
-                        hoursToMillion = math.floor(timeToMillion / 3600)
-                        minutesToMillion = math.floor((timeToMillion % 3600) / 60)
-                        
-                        -- Средняя цена проданного предмета
-                        local avgItemPrice = (farmStats.itemsSold and farmStats.itemsSold > 0) and (farmStats.moneySold / farmStats.itemsSold) or 0
-                        if avgItemPrice > 0 then
-                            itemsToMillion = math.ceil(moneyNeeded / avgItemPrice)
-                        end
-                    end
-                elseif moneyNeeded == 0 then
-                    timeToMillion = 0
-                    itemsToMillion = 0
-                    hoursToMillion = 0
-                    minutesToMillion = 0
-                else
-                    -- Недостаточно данных для прогноза
-                    timeToMillion = -1
-                    itemsToMillion = -1
-                    hoursToMillion = -1
-                    minutesToMillion = -1
-                end
                 
                 local statsData = {
                     balance = money,
@@ -2592,12 +2589,7 @@ local function StartCommandHandler()
                     items_collected_delta = itemsCollectedDelta,
                     items_sold_delta = itemsSoldDelta,
                     money_collected_delta = moneyCollectedDelta,
-                    money_sold_delta = moneySoldDelta,
-                    money_needed = moneyNeeded,
-                    time_to_million = timeToMillion,
-                    items_to_million = itemsToMillion,
-                    hours_to_million = hoursToMillion,
-                    minutes_to_million = minutesToMillion
+                    money_sold_delta = moneySoldDelta
                 }
                 
                 local HttpService = game:GetService("HttpService")
@@ -3264,7 +3256,7 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
 -- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
 task.spawn(function()
     task.wait(0.5)  -- Ждем создания Options
-    if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil and Options.FarmItems then
+    if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil and Options and Options.FarmItems then
         Settings.FarmItems = _G.YBAFarmItems  -- ВАЖНО: Обновляем Settings!
         Options.FarmItems:SetValue(_G.YBAFarmItems)
         print("[YBA Enhanced] FarmItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
@@ -3304,7 +3296,7 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
 -- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (ПОСЛЕ создания Options)
 task.spawn(function()
     task.wait(0.5)  -- Ждем создания Options
-    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options.SellItems then
+    if _G.YBASellItems and next(_G.YBASellItems) ~= nil and Options and Options.SellItems then
         Settings.SellItems = _G.YBASellItems  -- ВАЖНО: Обновляем Settings!
         Options.SellItems:SetValue(_G.YBASellItems)
         print("[YBA Enhanced] SellItems восстановлены в UI: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
@@ -3799,12 +3791,15 @@ function Console.AddLog(text, color)
     -- КРИТИЧНО: Обновляем CanvasSize после добавления текста
     task.spawn(function()
         task.wait(0.05)
+        if not consoleOutput then return end
         local scrollFrame = consoleOutput.Parent
-        if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+        if scrollFrame and scrollFrame:IsA("ScrollingFrame") and consoleOutput.AbsoluteSize then
             -- Устанавливаем CanvasSize равным высоте TextBox
             scrollFrame.CanvasSize = UDim2.new(0, 0, 0, consoleOutput.AbsoluteSize.Y + 20)
             -- Auto-scroll to bottom
-            scrollFrame.CanvasPosition = Vector2.new(0, consoleOutput.AbsoluteSize.Y)
+            if scrollFrame.AbsoluteCanvasSize then
+                scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+            end
         end
     end)
 end
