@@ -24,6 +24,19 @@ task.spawn(function()
         return
     end
     
+    -- НОВОЕ: Проверяем престиж ПЕРЕД всем остальным
+    local prestige = 0
+    pcall(function()
+        local playerStats = player:WaitForChild("PlayerStats", 5)
+        if playerStats then
+            local prestigeValue = playerStats:FindFirstChild("Prestige")
+            if prestigeValue then
+                prestige = prestigeValue.Value or 0
+                print("[YBA Enhanced] Престиж игрока: " .. prestige)
+            end
+        end
+    end)
+    
     -- Ждем появления LoadingScreen
     local loadingScreen = playerGui:WaitForChild("LoadingScreen", 30)
     
@@ -38,11 +51,37 @@ task.spawn(function()
     local frames = loadingScreen:WaitForChild("Frames", 10)
     if not frames then return end
     
-    local main = frames:WaitForChild("Main", 10)
-    if not main then return end
+    local playButton = nil
+    local buttonPath = ""
     
-    local playButton = main:WaitForChild("Play", 10)
-    if not playButton then return end
+    -- НОВОЕ: Выбираем кнопку в зависимости от престижа
+    if prestige >= 1 then
+        -- Престиж есть - нажимаем кнопку в меню геймодов
+        print("[YBA Enhanced] Престиж >= 1, ищем кнопку в Gamemodes...")
+        local gamemodes = frames:WaitForChild("Gamemodes", 10)
+        if gamemodes then
+            local mainGame = gamemodes:WaitForChild("MainGame", 10)
+            if mainGame then
+                playButton = mainGame:WaitForChild("Play", 10)
+                buttonPath = "LoadingScreen.Frames.Gamemodes.MainGame.Play"
+            end
+        end
+    else
+        -- Престижа нет - нажимаем обычную кнопку
+        print("[YBA Enhanced] Престиж = 0, ищем кнопку в Main...")
+        local main = frames:WaitForChild("Main", 10)
+        if main then
+            playButton = main:WaitForChild("Play", 10)
+            buttonPath = "LoadingScreen.Frames.Main.Play"
+        end
+    end
+    
+    if not playButton then
+        print("[YBA Enhanced] Кнопка Play не найдена!")
+        return
+    end
+    
+    print("[YBA Enhanced] Кнопка найдена: " .. buttonPath)
     
     -- Ждем пока кнопка станет видимой
     local waitTime = 0
@@ -64,88 +103,49 @@ task.spawn(function()
         playButton.Visible = true
     end)
     
-    -- Нажимаем кнопку
-    task.wait(0.5)  -- Небольшая задержка для стабильности
+    -- НОВОЕ: Упрощенное нажатие кнопки (без Tab/Enter/Space)
+    task.wait(0.5)
     
     local success = false
-    for attempt = 1, 100 do  -- Увеличено до 100 попыток
-        -- Метод 1: VirtualInputManager Tab+Enter навигация
+    for attempt = 1, 50 do
+        -- Метод 1: Прямой вызов событий кнопки
         pcall(function()
-            local vim = game:GetService("VirtualInputManager")
-            -- Нажимаем Tab несколько раз чтобы выбрать кнопку
-            for i = 1, 5 do
-                vim:SendKeyEvent(true, Enum.KeyCode.Tab, false, game)
-                task.wait(0.03)
-                vim:SendKeyEvent(false, Enum.KeyCode.Tab, false, game)
-                task.wait(0.03)
-            end
-            -- Нажимаем Enter
-            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.05)
-            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-        end)
-        
-        -- Метод 2: GuiService.SelectedObject + Enter
-        pcall(function()
-            game:GetService("GuiService").SelectedObject = playButton
-            task.wait(0.05)
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.05)
-            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-        end)
-        
-        -- Метод 3: VirtualInputManager Space (альтернатива Enter)
-        pcall(function()
-            game:GetService("GuiService").SelectedObject = playButton
-            task.wait(0.05)
-            local vim = game:GetService("VirtualInputManager")
-            vim:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.05)
-            vim:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-        end)
-        
-        -- Метод 4: Прямой вызов функции кнопки (если есть)
-        if attempt % 10 == 0 then
-            pcall(function()
-                if playButton:IsA("GuiButton") or playButton:IsA("TextButton") or playButton:IsA("ImageButton") then
-                    -- Пытаемся найти и вызвать функцию обработчика
-                    for _, connection in pairs(getconnections(playButton.MouseButton1Click)) do
-                        pcall(function()
-                            connection:Fire()
-                        end)
-                    end
-                    for _, connection in pairs(getconnections(playButton.Activated)) do
-                        pcall(function()
-                            connection:Fire()
-                        end)
-                    end
+            if playButton:IsA("GuiButton") or playButton:IsA("TextButton") or playButton:IsA("ImageButton") then
+                for _, connection in pairs(getconnections(playButton.MouseButton1Click)) do
+                    pcall(function()
+                        connection:Fire()
+                    end)
                 end
+                for _, connection in pairs(getconnections(playButton.Activated)) do
+                    pcall(function()
+                        connection:Fire()
+                    end)
+                end
+            end
+        end)
+        
+        -- Метод 2: GuiService.SelectedObject + Enter (запасной)
+        if attempt % 5 == 0 then
+            pcall(function()
+                game:GetService("GuiService").SelectedObject = playButton
+                task.wait(0.05)
+                local vim = game:GetService("VirtualInputManager")
+                vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+                task.wait(0.05)
+                vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
             end)
         end
         
-        -- Метод 5: Изменение свойств LoadingScreen напрямую
-        if attempt % 20 == 0 then
+        -- Метод 3: Отключаем LoadingScreen если долго не получается
+        if attempt > 30 then
             pcall(function()
                 loadingScreen.Enabled = false
                 print("[YBA Enhanced] Попытка " .. attempt .. ": Отключен LoadingScreen.Enabled")
             end)
         end
         
-        -- Метод 6: Удаление всех Frame внутри LoadingScreen
-        if attempt > 50 then
-            pcall(function()
-                for _, child in pairs(loadingScreen:GetChildren()) do
-                    if child:IsA("Frame") or child:IsA("ScreenGui") then
-                        child:Destroy()
-                    end
-                end
-                print("[YBA Enhanced] Попытка " .. attempt .. ": Удалены Frame внутри LoadingScreen")
-            end)
-        end
-        
-        -- Метод 7: Полное удаление LoadingScreen
-        if attempt > 70 then
+        -- Метод 4: Удаляем LoadingScreen если совсем не получается
+        if attempt > 40 then
             pcall(function()
                 loadingScreen:Destroy()
                 print("[YBA Enhanced] Попытка " .. attempt .. ": LoadingScreen удален")
@@ -156,14 +156,14 @@ task.spawn(function()
         if not loadingScreen or not loadingScreen.Parent or not loadingScreen.Enabled then
             print("[YBA Enhanced] LoadingScreen закрылся! Кнопка сработала.")
             success = true
-            break  -- КРИТИЧНО: Выходим из цикла сразу
+            break
         end
         
         task.wait(0.1)
     end
     
     if not success then
-        print("[YBA Enhanced] Не удалось нажать кнопку Play за 100 попыток")
+        print("[YBA Enhanced] Не удалось нажать кнопку Play за 50 попыток")
         print("[YBA Enhanced] Принудительное удаление LoadingScreen...")
         pcall(function()
             if loadingScreen then
@@ -233,12 +233,18 @@ task.spawn(function()
         if Options.FarmItems and Settings.FarmItems then
             Options.FarmItems:SetValue(Settings.FarmItems)
             print("[YBA Enhanced] FarmItems установлены в UI")
+            -- КРИТИЧНО: Обновляем Settings вручную т.к. SetValue НЕ вызывает Callback!
+            Settings.FarmItems = _G.YBAFarmItems
+            print("[YBA Enhanced] Settings.FarmItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.FarmItems не найден!")
         end
         if Options.SellItems and Settings.SellItems then
             Options.SellItems:SetValue(Settings.SellItems)
             print("[YBA Enhanced] SellItems установлены в UI")
+            -- КРИТИЧНО: Обновляем Settings вручную т.к. SetValue НЕ вызывает Callback!
+            Settings.SellItems = _G.YBASellItems
+            print("[YBA Enhanced] Settings.SellItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.SellItems не найден!")
         end
@@ -250,6 +256,20 @@ task.spawn(function()
             
             -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autofarm = true
+            print("[YBA Enhanced] Settings.Autofarm = true")
+            
+            -- КРИТИЧНО: Проверяем что Settings.FarmItems НЕ пустой!
+            if not Settings.FarmItems or not next(Settings.FarmItems) then
+                print("[YBA Enhanced] ПРЕДУПРЕЖДЕНИЕ: Settings.FarmItems пустой! Восстанавливаем из _G...")
+                if _G.YBAFarmItems and next(_G.YBAFarmItems) then
+                    Settings.FarmItems = _G.YBAFarmItems
+                    print("[YBA Enhanced] Settings.FarmItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+                else
+                    print("[YBA Enhanced] ОШИБКА: _G.YBAFarmItems тоже пустой!")
+                end
+            else
+                print("[YBA Enhanced] Settings.FarmItems не пустой: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+            end
             
             -- Ждем создания Options
             local waitTime = 0
@@ -269,9 +289,22 @@ task.spawn(function()
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutofarm ВРУЧНУЮ!
             print("[YBA Enhanced] Запуск StartAutofarm()...")
+            print("[YBA Enhanced] ФИНАЛЬНАЯ ПРОВЕРКА:")
+            print("[YBA Enhanced]   Settings.Autofarm = " .. tostring(Settings.Autofarm))
+            print("[YBA Enhanced]   Settings.FarmItems = " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems or {}))
+            
             if StartAutofarm then
-                StartAutofarm()
-                print("[YBA Enhanced] StartAutofarm() выполнен успешно")
+                if Settings.FarmItems and next(Settings.FarmItems) then
+                    StartAutofarm()
+                    print("[YBA Enhanced] StartAutofarm() выполнен успешно")
+                else
+                    print("[YBA Enhanced] ОШИБКА: Settings.FarmItems пустой! Автофарм НЕ запущен!")
+                    Library:Notify({
+                        Title = "Ошибка",
+                        Content = "Settings.FarmItems пустой! Выбери предметы в меню.",
+                        Duration = 5
+                    })
+                end
             else
                 print("[YBA Enhanced] ОШИБКА: Функция StartAutofarm не найдена!")
             end
@@ -292,6 +325,20 @@ task.spawn(function()
             
             -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autosell = true
+            print("[YBA Enhanced] Settings.Autosell = true")
+            
+            -- КРИТИЧНО: Проверяем что Settings.SellItems НЕ пустой!
+            if not Settings.SellItems or not next(Settings.SellItems) then
+                print("[YBA Enhanced] ПРЕДУПРЕЖДЕНИЕ: Settings.SellItems пустой! Восстанавливаем из _G...")
+                if _G.YBASellItems and next(_G.YBASellItems) then
+                    Settings.SellItems = _G.YBASellItems
+                    print("[YBA Enhanced] Settings.SellItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+                else
+                    print("[YBA Enhanced] ОШИБКА: _G.YBASellItems тоже пустой!")
+                end
+            else
+                print("[YBA Enhanced] Settings.SellItems не пустой: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+            end
             
             -- Ждем создания Options
             local waitTime = 0
@@ -311,9 +358,22 @@ task.spawn(function()
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutosell ВРУЧНУЮ!
             print("[YBA Enhanced] Запуск StartAutosell()...")
+            print("[YBA Enhanced] ФИНАЛЬНАЯ ПРОВЕРКА:")
+            print("[YBA Enhanced]   Settings.Autosell = " .. tostring(Settings.Autosell))
+            print("[YBA Enhanced]   Settings.SellItems = " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
+            
             if StartAutosell then
-                StartAutosell()
-                print("[YBA Enhanced] StartAutosell() выполнен успешно")
+                if Settings.SellItems and next(Settings.SellItems) then
+                    StartAutosell()
+                    print("[YBA Enhanced] StartAutosell() выполнен успешно")
+                else
+                    print("[YBA Enhanced] ОШИБКА: Settings.SellItems пустой! Автопродажа НЕ запущена!")
+                    Library:Notify({
+                        Title = "Ошибка",
+                        Content = "Settings.SellItems пустой! Выбери предметы в меню.",
+                        Duration = 5
+                    })
+                end
             else
                 print("[YBA Enhanced] ОШИБКА: Функция StartAutosell не найдена!")
             end
@@ -2344,7 +2404,8 @@ local function StartCommandHandler()
                 farmStats.prevMoneyCollected = farmStats.moneyCollected
                 farmStats.prevMoneySold = farmStats.moneySold
                 
-                if uptime > 60 and farmStats.moneySold and farmStats.moneySold > 0 then
+                -- ИСПРАВЛЕНО: Убрано условие uptime > 60, прогноз показывается всегда
+                if uptime > 0 and farmStats.moneySold and farmStats.moneySold > 0 then
                     -- Скорость фарма денег в секунду
                     local moneyPerSecond = farmStats.moneySold / uptime
                     
