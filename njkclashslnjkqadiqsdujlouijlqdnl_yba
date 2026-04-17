@@ -372,9 +372,9 @@ task.spawn(function()
         -- Ждем загрузки UI
         task.wait(2)
         
-        -- БЕЗОПАСНО: Проверяем что Settings существует
-        if Settings and Settings.Autofarm then
-            print("[YBA Enhanced] Автозапуск автофарма (из настроек)...")
+        -- КРИТИЧНО: Проверяем сохраненные настройки из файла
+        if Settings.Autofarm then
+            print("[YBA Enhanced] Автозапуск автофарма (из файла настроек)...")
             task.wait(1)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
@@ -383,18 +383,28 @@ task.spawn(function()
                 print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
             end
             
-            StartAutofarm()
-            
-            Library:Notify({
-                Title = "Автозапуск",
-                Content = "Автофарм запущен автоматически!",
-                Duration = 3
-            })
+            -- КРИТИЧНО: Проверяем что FarmItems не пустой
+            if Settings.FarmItems and next(Settings.FarmItems) then
+                StartAutofarm()
+                
+                Library:Notify({
+                    Title = "Автозапуск",
+                    Content = "Автофарм запущен автоматически!",
+                    Duration = 3
+                })
+            else
+                print("[YBA Enhanced] ОШИБКА: FarmItems пустой! Автофарм НЕ запущен!")
+                Library:Notify({
+                    Title = "Ошибка",
+                    Content = "Выбери предметы для фарма в меню!",
+                    Duration = 5
+                })
+            end
         end
         
         -- Если автопродажа была включена - запускаем
-        if Settings and Settings.Autosell then
-            print("[YBA Enhanced] Автозапуск автопродажи (из настроек)...")
+        if Settings.Autosell then
+            print("[YBA Enhanced] Автозапуск автопродажи (из файла настроек)...")
             task.wait(0.5)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
@@ -403,13 +413,23 @@ task.spawn(function()
                 print("[YBA Enhanced] Тумблер Autosell установлен в ON")
             end
             
-            StartAutosell()
-            
-            Library:Notify({
-                Title = "Автозапуск",
-                Content = "Автопродажа запущена автоматически!",
-                Duration = 3
-            })
+            -- КРИТИЧНО: Проверяем что SellItems не пустой
+            if Settings.SellItems and next(Settings.SellItems) then
+                StartAutosell()
+                
+                Library:Notify({
+                    Title = "Автозапуск",
+                    Content = "Автопродажа запущена автоматически!",
+                    Duration = 3
+                })
+            else
+                print("[YBA Enhanced] ОШИБКА: SellItems пустой! Автопродажа НЕ запущена!")
+                Library:Notify({
+                    Title = "Ошибка",
+                    Content = "Выбери предметы для продажи в меню!",
+                    Duration = 5
+                })
+            end
         end
         
         -- Если детектор читеров был включен - запускаем
@@ -597,14 +617,24 @@ local function loadSettings()
         for key, value in pairs(DefaultSettings) do
             Settings[key] = saved[key] ~= nil and saved[key] or value
         end
-        Settings.Autofarm = false
+        -- КРИТИЧНО: Загружаем состояние автофарма и автоселла
+        if saved.Autofarm ~= nil then
+            Settings.Autofarm = saved.Autofarm
+            print("[YBA Enhanced] Загружено Autofarm: " .. tostring(Settings.Autofarm))
+        end
+        if saved.Autosell ~= nil then
+            Settings.Autosell = saved.Autosell
+            print("[YBA Enhanced] Загружено Autosell: " .. tostring(Settings.Autosell))
+        end
         if saved.FarmItems and type(saved.FarmItems) == "table" then
             Settings.FarmItems = saved.FarmItems
+            print("[YBA Enhanced] Загружено FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
             Settings.FarmItems = {}
         end
         if saved.SellItems and type(saved.SellItems) == "table" then
             Settings.SellItems = saved.SellItems
+            print("[YBA Enhanced] Загружено SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
             Settings.SellItems = {}
         end
@@ -622,7 +652,8 @@ end
 local function saveSettings()
     pcall(function()
         local settingsToSave = table.clone(Settings)
-        settingsToSave.Autofarm = false
+        settingsToSave.Autofarm = Settings.Autofarm  -- КРИТИЧНО: Сохраняем состояние автофарма
+        settingsToSave.Autosell = Settings.Autosell  -- КРИТИЧНО: Сохраняем состояние автоселла
         settingsToSave.FarmItems = Settings.FarmItems
         settingsToSave.SellItems = Settings.SellItems
         settingsToSave.ESPSettings = ESPSettings
@@ -630,6 +661,8 @@ local function saveSettings()
         
         local jsonData = game:GetService("HttpService"):JSONEncode(settingsToSave)
         writefile("YBA_Enhanced_Settings.json", jsonData)
+        
+        print("[YBA Enhanced] Настройки сохранены: Autofarm=" .. tostring(Settings.Autofarm) .. ", Autosell=" .. tostring(Settings.Autosell))
     end)
 end
 
@@ -2019,9 +2052,6 @@ local function StartAutosell()
     _G.YBAAutoSellEnabled = true
     _G.YBASellItems = Settings.SellItems
     
-    -- Reset sold items counter
-    farmStats.itemsSold = 0
-    
     Library:Notify({
         Title = "Autosell",
         Content = "Автопродажа запущена! Лимит: $1,000,000",
@@ -2498,8 +2528,8 @@ local function StartCommandHandler()
                 farmStats.prevMoneyCollected = farmStats.moneyCollected
                 farmStats.prevMoneySold = farmStats.moneySold
                 
-                -- ИСПРАВЛЕНО: Убрано условие uptime > 60, прогноз показывается всегда
-                if uptime > 0 and farmStats.moneySold and farmStats.moneySold > 0 then
+                -- КРИТИЧНО: Прогноз работает только если есть данные (минимум 60 секунд работы)
+                if uptime >= 60 and farmStats.moneySold and farmStats.moneySold > 0 then
                     -- Скорость фарма денег в секунду
                     local moneyPerSecond = farmStats.moneySold / uptime
                     
@@ -2517,6 +2547,14 @@ local function StartCommandHandler()
                 elseif moneyNeeded == 0 then
                     timeToMillion = 0
                     itemsToMillion = 0
+                    hoursToMillion = 0
+                    minutesToMillion = 0
+                else
+                    -- Недостаточно данных для прогноза
+                    timeToMillion = -1
+                    itemsToMillion = -1
+                    hoursToMillion = -1
+                    minutesToMillion = -1
                 end
                 
                 local statsData = {
@@ -3758,30 +3796,6 @@ local SettingsTab = Window:AddTab({
     Icon = "settings"
 })
 
-SettingsTab:AddToggle("Platform", {
-    Title = "Farm Platform",
-    Description = "Create a platform for farming",
-    Default = Settings.Platform,
-    Callback = function(Value)
-        Settings.Platform = Value
-        saveSettings()
-        
-        if Value then
-            CreateFarmPlatform()
-        else
-            DestroyFarmPlatform()
-        end
-    end
-})
-
-SettingsTab:AddButton({
-    Title = "Teleport to Platform",
-    Description = "Teleport to farm platform",
-    Callback = function()
-        TeleportToPlatform()
-    end
-})
-
 SettingsTab:AddToggle("UnlockZoom", {
     Title = "Unlock Zoom",
     Description = "Remove camera zoom distance limit",
@@ -3812,30 +3826,6 @@ SettingsTab:AddToggle("CustomConsole", {
             StartConsole()
         else
             StopConsole()
-        end
-    end
-})
-
-SettingsTab:AddToggle("DebugMode", {
-    Title = "Debug Mode",
-    Description = "Показывать отладочную информацию в консоли",
-    Default = Settings.DebugMode or false,
-    Callback = function(Value)
-        Settings.DebugMode = Value
-        saveSettings()
-        
-        if Value then
-            Library:Notify({
-                Title = "Debug Mode",
-                Content = "Отладка включена! Статистика будет выводиться в консоль.",
-                Duration = 3
-            })
-        else
-            Library:Notify({
-                Title = "Debug Mode",
-                Content = "Отладка выключена.",
-                Duration = 3
-            })
         end
     end
 })
