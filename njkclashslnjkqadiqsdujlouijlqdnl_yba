@@ -452,7 +452,20 @@ task.spawn(function()
         print("[YBA Enhanced] Обычный запуск - проверка настроек...")
         
         -- Ждем загрузки UI
-        task.wait(2)
+        task.wait(3)  -- УВЕЛИЧЕНА задержка с 2 до 3 секунд
+        
+        -- КРИТИЧНО: Ждем создания Options
+        local maxWait = 10
+        local waited = 0
+        while (not Options.Autofarm or not Options.Autosell) and waited < maxWait do
+            task.wait(0.5)
+            waited = waited + 0.5
+            print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
+        end
+        
+        if not Options.Autofarm or not Options.Autosell then
+            print("[YBA Enhanced] ОШИБКА: Options не созданы за " .. maxWait .. " секунд!")
+        end
         
         -- КРИТИЧНО: Проверяем сохраненные настройки из файла
         if Settings.Autofarm then
@@ -2791,18 +2804,15 @@ end
 
 -- ESP Functions
 local function CreateESP(player)
-    if not DrawingSupported or not Drawing then 
+    -- КРИТИЧНО: Проверяем Drawing API ПЕРЕД любыми вызовами
+    if not DrawingSupported or not Drawing or not Drawing.new then 
         return 
     end
     if player == LocalPlayer then return end
     if Drawings.ESP[player] then RemoveESP(player) end
     
     local success, err = pcall(function()
-        -- КРИТИЧНО: Проверяем что Drawing.new существует
-        if not Drawing or not Drawing.new then
-            return
-        end
-        
+        -- Создаем Drawing объекты
         local box = {TopLeft = Drawing.new("Line"), TopRight = Drawing.new("Line"), BottomLeft = Drawing.new("Line"), BottomRight = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line"), Top = Drawing.new("Line"), Bottom = Drawing.new("Line")}
         for _, line in pairs(box) do if line then line.Visible = false line.Color = Colors.Enemy line.Thickness = ESPSettings.BoxThickness if line == box.Fill then line.Filled = true line.Transparency = ESPSettings.BoxFillTransparency end end end
         
@@ -3739,49 +3749,66 @@ function Console.Create()
         Console.Destroy()
     end)
     
-    -- НОВОЕ: Кнопка копирования (без RichText тегов)
-    local copyBtn = Instance.new("TextButton")
-    copyBtn.Name = "CopyButton"
-    copyBtn.Size = UDim2.new(0, 60, 0, 30)
-    copyBtn.Position = UDim2.new(1, -95, 0, 0)
-    copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-    copyBtn.BorderSizePixel = 0
-    copyBtn.Text = "Copy"
-    copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    copyBtn.TextSize = 12
-    copyBtn.Font = Enum.Font.SourceSansBold
-    copyBtn.Parent = titleBar
+    -- НОВОЕ: Кнопка сворачивания
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Name = "MinimizeButton"
+    minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+    minimizeBtn.Position = UDim2.new(1, -65, 0, 0)
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+    minimizeBtn.BorderSizePixel = 0
+    minimizeBtn.Text = "_"
+    minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minimizeBtn.TextSize = 18
+    minimizeBtn.Font = Enum.Font.SourceSansBold
+    minimizeBtn.Parent = titleBar
     
-    copyBtn.MouseButton1Click:Connect(function()
-        -- Копируем чистый текст из TextBox (БЕЗ RichText тегов)
-        local plainText = consoleOutput.Text
-        
-        -- Копируем в буфер обмена
-        local success = pcall(function()
-            setclipboard(plainText)
-        end)
-        
-        if success then
-            -- Визуальная обратная связь
-            copyBtn.Text = "Copied!"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
-            task.wait(1)
-            copyBtn.Text = "Copy"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-        else
-            copyBtn.Text = "Error!"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-            task.wait(1)
-            copyBtn.Text = "Copy"
-            copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-        end
+    -- Создаем мини-версию консоли (свернутая)
+    local miniConsole = Instance.new("Frame")
+    miniConsole.Name = "MiniConsole"
+    miniConsole.Size = UDim2.new(0, 150, 0, 40)
+    miniConsole.Position = UDim2.new(0.5, -75, 0.9, -20)
+    miniConsole.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    miniConsole.BorderSizePixel = 2
+    miniConsole.BorderColor3 = Color3.fromRGB(255, 165, 0)
+    miniConsole.Active = true
+    miniConsole.Draggable = true
+    miniConsole.Visible = false
+    miniConsole.Parent = consoleGui
+    
+    local miniLabel = Instance.new("TextLabel")
+    miniLabel.Name = "Label"
+    miniLabel.Size = UDim2.new(1, 0, 1, 0)
+    miniLabel.BackgroundTransparency = 1
+    miniLabel.Text = "📋 Console"
+    miniLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    miniLabel.TextSize = 14
+    miniLabel.Font = Enum.Font.SourceSansBold
+    miniLabel.Parent = miniConsole
+    
+    -- Делаем мини-консоль кликабельной
+    local miniBtn = Instance.new("TextButton")
+    miniBtn.Name = "ClickArea"
+    miniBtn.Size = UDim2.new(1, 0, 1, 0)
+    miniBtn.BackgroundTransparency = 1
+    miniBtn.Text = ""
+    miniBtn.Parent = miniConsole
+    
+    -- Логика сворачивания/разворачивания
+    minimizeBtn.MouseButton1Click:Connect(function()
+        consoleFrame.Visible = false
+        miniConsole.Visible = true
+    end)
+    
+    miniBtn.MouseButton1Click:Connect(function()
+        miniConsole.Visible = false
+        consoleFrame.Visible = true
     end)
     
     -- НОВОЕ: Кнопка очистки
     local clearBtn = Instance.new("TextButton")
     clearBtn.Name = "ClearButton"
     clearBtn.Size = UDim2.new(0, 60, 0, 30)
-    clearBtn.Position = UDim2.new(1, -160, 0, 0)
+    clearBtn.Position = UDim2.new(1, -100, 0, 0)
     clearBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
     clearBtn.BorderSizePixel = 0
     clearBtn.Text = "Clear"
