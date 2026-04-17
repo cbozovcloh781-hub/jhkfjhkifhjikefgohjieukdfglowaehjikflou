@@ -3753,8 +3753,8 @@ function Console.Create()
     copyBtn.Parent = titleBar
     
     copyBtn.MouseButton1Click:Connect(function()
-        -- Копируем чистый текст из невидимого TextBox
-        local plainText = plainTextStorage.Text
+        -- Копируем чистый текст из TextBox (БЕЗ RichText тегов)
+        local plainText = consoleOutput.Text
         
         -- Копируем в буфер обмена
         local success = pcall(function()
@@ -3807,29 +3807,46 @@ function Console.Create()
     scrollFrame.Active = true
     scrollFrame.Parent = consoleFrame
     
-    -- Output TextLabel (READ-ONLY, БЕЗ БАГА С ТЕГАМИ)
-    consoleOutput = Instance.new("TextLabel")
+    -- Output TextBox (SELECTABLE + КОПИРУЕМЫЙ)
+    consoleOutput = Instance.new("TextBox")
     consoleOutput.Name = "Output"
     consoleOutput.Size = UDim2.new(1, -10, 1, 0)
     consoleOutput.Position = UDim2.new(0, 0, 0, 0)
     consoleOutput.BackgroundTransparency = 1
     consoleOutput.BorderSizePixel = 0
     consoleOutput.Text = ""
-    consoleOutput.RichText = true
+    consoleOutput.RichText = false  -- КРИТИЧНО: ВЫКЛЮЧАЕМ RichText чтобы теги не показывались!
     consoleOutput.TextColor3 = Color3.fromRGB(255, 255, 255)
     consoleOutput.TextSize = 12
     consoleOutput.Font = Enum.Font.SourceSans
     consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
     consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
     consoleOutput.TextWrapped = true
+    consoleOutput.MultiLine = true
+    consoleOutput.ClearTextOnFocus = false
+    consoleOutput.TextEditable = false
     consoleOutput.Parent = scrollFrame
     
-    -- НОВОЕ: Невидимый TextBox для хранения чистого текста (без RichText)
-    local plainTextStorage = Instance.new("TextBox")
-    plainTextStorage.Name = "PlainTextStorage"
-    plainTextStorage.Visible = false
-    plainTextStorage.Text = ""
-    plainTextStorage.Parent = consoleFrame
+    -- НОВОЕ: Невидимый TextLabel для ОТОБРАЖЕНИЯ с цветами (поверх TextBox)
+    local coloredDisplay = Instance.new("TextLabel")
+    coloredDisplay.Name = "ColoredDisplay"
+    coloredDisplay.Size = UDim2.new(1, -10, 1, 0)
+    coloredDisplay.Position = UDim2.new(0, 0, 0, 0)
+    coloredDisplay.BackgroundTransparency = 1
+    coloredDisplay.BorderSizePixel = 0
+    coloredDisplay.Text = ""
+    coloredDisplay.RichText = true  -- Включаем RichText для цветов
+    coloredDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
+    coloredDisplay.TextSize = 12
+    coloredDisplay.Font = Enum.Font.SourceSans
+    coloredDisplay.TextXAlignment = Enum.TextXAlignment.Left
+    coloredDisplay.TextYAlignment = Enum.TextYAlignment.Top
+    coloredDisplay.TextWrapped = true
+    coloredDisplay.ZIndex = 2  -- Поверх TextBox
+    coloredDisplay.Parent = scrollFrame
+    
+    -- КРИТИЧНО: Делаем coloredDisplay прозрачным для кликов (чтобы можно было выделять текст в TextBox)
+    coloredDisplay.Active = false
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3913,14 +3930,14 @@ function Console.AddLog(text, color)
     local escapedText = escapeRichText(text)
     local escapedTimestamp = escapeRichText(timestamp)
     
-    -- Добавляем лог с цветом через RichText
-    local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
-    consoleOutput.Text = consoleOutput.Text .. coloredText
+    -- НОВОЕ: Добавляем ЧИСТЫЙ текст в TextBox (для копирования)
+    consoleOutput.Text = consoleOutput.Text .. timestamp .. text .. "\n"
     
-    -- НОВОЕ: Добавляем чистый текст в невидимый TextBox
-    local plainTextStorage = consoleFrame:FindFirstChild("PlainTextStorage")
-    if plainTextStorage then
-        plainTextStorage.Text = plainTextStorage.Text .. timestamp .. text .. "\n"
+    -- НОВОЕ: Добавляем ЦВЕТНОЙ текст в TextLabel (для отображения)
+    local coloredDisplay = consoleOutput.Parent:FindFirstChild("ColoredDisplay")
+    if coloredDisplay then
+        local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
+        coloredDisplay.Text = coloredDisplay.Text .. coloredText
     end
     
     -- КРИТИЧНО: Обновляем CanvasSize ТОЛЬКО если пользователь НЕ взаимодействует с консолью
@@ -3936,25 +3953,30 @@ function Console.AddLog(text, color)
             if not userInteracting then
                 -- ИСПРАВЛЕНО: Рассчитываем высоту текста вручную
                 local textService = game:GetService("TextService")
-                local textBounds = textService:GetTextSize(
-                    consoleOutput.Text,
-                    consoleOutput.TextSize,
-                    consoleOutput.Font,
-                    Vector2.new(scrollFrame.AbsoluteSize.X - 20, math.huge)
-                )
                 
-                local textHeight = textBounds.Y + 20  -- +20 для отступа
-                
-                -- Устанавливаем CanvasSize равным высоте текста
-                scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight)
-                
-                -- Автоскролл только если уже был внизу
-                if scrollFrame.AbsoluteCanvasSize and scrollFrame.AbsoluteWindowSize then
-                    local maxScroll = scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y
-                    local currentScroll = scrollFrame.CanvasPosition.Y
-                    -- Скроллим вниз только если уже были близко к низу (в пределах 100 пикселей)
-                    if maxScroll - currentScroll < 100 then
-                        scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+                -- КРИТИЧНО: Используем ColoredDisplay для расчета высоты (т.к. он с RichText)
+                local coloredDisplay = scrollFrame:FindFirstChild("ColoredDisplay")
+                if coloredDisplay then
+                    local textBounds = textService:GetTextSize(
+                        coloredDisplay.Text,
+                        coloredDisplay.TextSize,
+                        coloredDisplay.Font,
+                        Vector2.new(scrollFrame.AbsoluteSize.X - 20, math.huge)
+                    )
+                    
+                    local textHeight = textBounds.Y + 20  -- +20 для отступа
+                    
+                    -- Устанавливаем CanvasSize равным высоте текста
+                    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight)
+                    
+                    -- Автоскролл только если уже был внизу
+                    if scrollFrame.AbsoluteCanvasSize and scrollFrame.AbsoluteWindowSize then
+                        local maxScroll = scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y
+                        local currentScroll = scrollFrame.CanvasPosition.Y
+                        -- Скроллим вниз только если уже были близко к низу (в пределах 100 пикселей)
+                        if maxScroll - currentScroll < 100 then
+                            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+                        end
                     end
                 end
             end
@@ -3966,10 +3988,10 @@ function Console.Clear()
     if not consoleOutput then return end
     consoleOutput.Text = ""
     
-    -- Очищаем чистый текст
-    local plainTextStorage = consoleFrame:FindFirstChild("PlainTextStorage")
-    if plainTextStorage then
-        plainTextStorage.Text = ""
+    -- Очищаем цветной дисплей
+    local coloredDisplay = consoleOutput.Parent:FindFirstChild("ColoredDisplay")
+    if coloredDisplay then
+        coloredDisplay.Text = ""
     end
     
     -- Сбрасываем позицию скролла
