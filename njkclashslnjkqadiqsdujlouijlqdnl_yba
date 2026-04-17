@@ -3666,14 +3666,23 @@ function Console.Create()
     scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     scrollFrame.Parent = consoleFrame
     
-    -- UIListLayout для автоматического расположения логов
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 2)
-    listLayout.Parent = scrollFrame
-    
-    -- Сохраняем scrollFrame для доступа
-    consoleOutput = scrollFrame
+    -- Output TextLabel с RichText (SELECTABLE)
+    consoleOutput = Instance.new("TextLabel")
+    consoleOutput.Name = "Output"
+    consoleOutput.Size = UDim2.new(1, -8, 1, 0)
+    consoleOutput.Position = UDim2.new(0, 0, 0, 0)
+    consoleOutput.BackgroundTransparency = 1
+    consoleOutput.BorderSizePixel = 0
+    consoleOutput.Text = ""
+    consoleOutput.RichText = true
+    consoleOutput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    consoleOutput.TextSize = 12
+    consoleOutput.Font = Enum.Font.SourceSans
+    consoleOutput.TextXAlignment = Enum.TextXAlignment.Left
+    consoleOutput.TextYAlignment = Enum.TextYAlignment.Top
+    consoleOutput.TextWrapped = true
+    consoleOutput.AutomaticSize = Enum.AutomaticSize.Y
+    consoleOutput.Parent = scrollFrame
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3722,100 +3731,55 @@ function Console.AddLog(text, color)
     local timestamp = "[" .. os.date("%H:%M:%S") .. "] "
     
     -- Определяем цвет по типу сообщения
-    local logColor = color or Color3.fromRGB(255, 255, 255)
-    local bgColor = Color3.fromRGB(45, 45, 45)
+    local colorHex = "#FFFFFF"
     
     -- Автоматическое определение цвета по ключевым словам
     if not color then
         if text:find("ERROR") or text:find("Error") or text:find("error") or text:find("ОШИБКА") or text:find("Ошибка") then
-            logColor = Color3.fromRGB(255, 80, 80)
-            bgColor = Color3.fromRGB(60, 30, 30)
+            colorHex = "#FF5050"
         elseif text:find("WARNING") or text:find("Warning") or text:find("ВНИМАНИЕ") or text:find("Предупреждение") then
-            logColor = Color3.fromRGB(255, 200, 80)
-            bgColor = Color3.fromRGB(60, 50, 30)
+            colorHex = "#FFC850"
         elseif text:find("SUCCESS") or text:find("Success") or text:find("УСПЕХ") or text:find("Успешно") then
-            logColor = Color3.fromRGB(80, 255, 120)
-            bgColor = Color3.fromRGB(30, 60, 35)
+            colorHex = "#50FF78"
         elseif text:find("INFO") or text:find("Info") or text:find("ИНФО") then
-            logColor = Color3.fromRGB(100, 200, 255)
-            bgColor = Color3.fromRGB(30, 45, 60)
+            colorHex = "#64C8FF"
         elseif text:find("DEBUG") or text:find("Debug") or text:find("ДЕБАГ") then
-            logColor = Color3.fromRGB(200, 150, 255)
-            bgColor = Color3.fromRGB(45, 35, 60)
+            colorHex = "#C896FF"
         elseif text:find("[YBA Enhanced]") or text:find("[Autofarm]") or text:find("[Autosell]") then
-            logColor = Color3.fromRGB(150, 255, 200)
-            bgColor = Color3.fromRGB(30, 50, 40)
+            colorHex = "#96FFC8"
         end
+    else
+        -- Конвертируем Color3 в hex
+        colorHex = string.format("#%02X%02X%02X", 
+            math.floor(color.R * 255), 
+            math.floor(color.G * 255), 
+            math.floor(color.B * 255)
+        )
     end
     
-    -- Создаем Frame для каждого лога
-    local logFrame = Instance.new("Frame")
-    logFrame.Name = "LogEntry"
-    logFrame.Size = UDim2.new(1, -8, 0, 0)
-    logFrame.BackgroundColor3 = bgColor
-    logFrame.BorderSizePixel = 0
-    logFrame.AutomaticSize = Enum.AutomaticSize.Y
-    logFrame.Parent = consoleOutput
-    
-    -- Padding для текста
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 5)
-    padding.PaddingRight = UDim.new(0, 5)
-    padding.PaddingTop = UDim.new(0, 3)
-    padding.PaddingBottom = UDim.new(0, 3)
-    padding.Parent = logFrame
-    
-    -- TextLabel для timestamp
-    local timestampLabel = Instance.new("TextLabel")
-    timestampLabel.Name = "Timestamp"
-    timestampLabel.Size = UDim2.new(0, 70, 0, 14)
-    timestampLabel.Position = UDim2.new(0, 0, 0, 0)
-    timestampLabel.BackgroundTransparency = 1
-    timestampLabel.Text = timestamp
-    timestampLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-    timestampLabel.TextSize = 11
-    timestampLabel.Font = Enum.Font.SourceSans
-    timestampLabel.TextXAlignment = Enum.TextXAlignment.Left
-    timestampLabel.Parent = logFrame
-    
-    -- TextBox для текста (чтобы можно было копировать)
-    local textBox = Instance.new("TextBox")
-    textBox.Name = "LogText"
-    textBox.Size = UDim2.new(1, -75, 1, 0)
-    textBox.Position = UDim2.new(0, 75, 0, 0)
-    textBox.BackgroundTransparency = 1
-    textBox.Text = text
-    textBox.TextColor3 = logColor
-    textBox.TextSize = 12
-    textBox.Font = Enum.Font.SourceSans
-    textBox.TextXAlignment = Enum.TextXAlignment.Left
-    textBox.TextYAlignment = Enum.TextYAlignment.Top
-    textBox.TextWrapped = true
-    textBox.MultiLine = true
-    textBox.ClearTextOnFocus = false
-    textBox.TextEditable = false
-    textBox.AutomaticSize = Enum.AutomaticSize.Y
-    textBox.Parent = logFrame
+    -- Добавляем лог с цветом через RichText
+    local coloredText = '<font color="#969696">' .. timestamp .. '</font><font color="' .. colorHex .. '">' .. text .. '</font>\n'
+    consoleOutput.Text = consoleOutput.Text .. coloredText
     
     -- Auto-scroll to bottom
     task.spawn(function()
         task.wait(0.05)
-        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.AbsoluteCanvasSize.Y)
+        local scrollFrame = consoleOutput.Parent
+        if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+        end
     end)
 end
 
 function Console.Clear()
     if not consoleOutput then return end
-    
-    -- Удаляем все логи
-    for _, child in pairs(consoleOutput:GetChildren()) do
-        if child:IsA("Frame") and child.Name == "LogEntry" then
-            child:Destroy()
-        end
-    end
+    consoleOutput.Text = ""
     
     -- Сбрасываем позицию скролла
-    consoleOutput.CanvasPosition = Vector2.new(0, 0)
+    local scrollFrame = consoleOutput.Parent
+    if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+        scrollFrame.CanvasPosition = Vector2.new(0, 0)
+    end
 end
 
 function Console.Destroy()
