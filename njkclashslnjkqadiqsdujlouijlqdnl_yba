@@ -48,28 +48,25 @@ task.spawn(function()
             forceConfig = HttpService:JSONDecode(response.Body)
             print("[YBA Enhanced] Конфиг загружен с сервера: " .. HttpService:JSONEncode(forceConfig))
             
-            -- КРИТИЧНО: Применяем конфиг
-            if forceConfig.force_restart then
-                print("[YBA Enhanced] ПРИНУДИТЕЛЬНЫЙ ПЕРЕЗАПУСК ФАРМА!")
-                _G.YBAAutoFarmEnabled = forceConfig.autofarm
-                _G.YBAAutoSellEnabled = forceConfig.autosell
-                _G.YBAFarmItems = {}
-                _G.YBASellItems = {}
-                
-                -- Конвертируем массивы в таблицы
-                for _, item in ipairs(forceConfig.farm_items or {}) do
-                    _G.YBAFarmItems[item] = true
-                end
-                for _, item in ipairs(forceConfig.sell_items or {}) do
-                    _G.YBASellItems[item] = true
-                end
-                
-                print("[YBA Enhanced] Конфиг применен:")
-                print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-                print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
-                print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(_G.YBAFarmItems))
-                print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(_G.YBASellItems))
+            -- Применяем конфиг
+            _G.YBAAutoFarmEnabled = forceConfig.autofarm
+            _G.YBAAutoSellEnabled = forceConfig.autosell
+            _G.YBAFarmItems = {}
+            _G.YBASellItems = {}
+            
+            -- Конвертируем массивы в таблицы
+            for _, item in ipairs(forceConfig.farm_items or {}) do
+                _G.YBAFarmItems[item] = true
             end
+            for _, item in ipairs(forceConfig.sell_items or {}) do
+                _G.YBASellItems[item] = true
+            end
+            
+            print("[YBA Enhanced] Конфиг применен:")
+            print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+            print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+            print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(_G.YBAFarmItems))
+            print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(_G.YBASellItems))
         end
     end)
     
@@ -746,6 +743,41 @@ local lastESPUpdate = {}
 local DrawingSupported = Drawing ~= nil and pcall(function() Drawing.new("Line") end)
 
 -- Load/Save functions
+-- КРИТИЧНО: Функция сохранения конфига на сервер
+local function SaveConfigToServer()
+    pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local config = {
+            autofarm = Settings.Autofarm,
+            autosell = Settings.Autosell,
+            farm_items = {},
+            sell_items = {}
+        }
+        
+        -- Конвертируем таблицы в массивы
+        for item, enabled in pairs(Settings.FarmItems or {}) do
+            if enabled then
+                table.insert(config.farm_items, item)
+            end
+        end
+        
+        for item, enabled in pairs(Settings.SellItems or {}) do
+            if enabled then
+                table.insert(config.sell_items, item)
+            end
+        end
+        
+        request({
+            Url = "http://localhost:5000/api/config",
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(config)
+        })
+        
+        print("[YBA Enhanced] Конфиг сохранен на сервер")
+    end)
+end
+
 local function loadSettings()
     local success, saved = pcall(function()
         return game:GetService("HttpService"):JSONDecode(readfile("YBA_Enhanced_Settings.json"))
@@ -3391,6 +3423,7 @@ Options.Autofarm = AutoTab:AddToggle("Autofarm", {
     Callback = function(Value)
         Settings.Autofarm = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         -- КРИТИЧНО: Обновляем _G переменную
         _G.YBAAutoFarmEnabled = Value
@@ -3412,6 +3445,7 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     Callback = function(Value)
         Settings.FarmItems = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         _G.YBAFarmItems = Value
         print("[YBA Enhanced] FarmItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
@@ -3434,6 +3468,7 @@ Options.Autosell = AutoTab:AddToggle("Autosell", {
     Callback = function(Value)
         Settings.Autosell = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         -- КРИТИЧНО: Обновляем _G переменную
         _G.YBAAutoSellEnabled = Value
@@ -3455,6 +3490,7 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     Callback = function(Value)
         Settings.SellItems = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         _G.YBASellItems = Value
         print("[YBA Enhanced] SellItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
