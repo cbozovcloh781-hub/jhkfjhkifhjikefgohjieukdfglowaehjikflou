@@ -35,6 +35,44 @@ task.spawn(function()
         return
     end
     
+    -- НОВОЕ: Загружаем конфиг с сервера ПЕРЕД всем остальным
+    local forceConfig = nil
+    pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local response = request({
+            Url = "http://localhost:5000/api/config",
+            Method = "GET"
+        })
+        
+        if response and response.StatusCode == 200 then
+            forceConfig = HttpService:JSONDecode(response.Body)
+            print("[YBA Enhanced] Конфиг загружен с сервера: " .. HttpService:JSONEncode(forceConfig))
+            
+            -- КРИТИЧНО: Применяем конфиг
+            if forceConfig.force_restart then
+                print("[YBA Enhanced] ПРИНУДИТЕЛЬНЫЙ ПЕРЕЗАПУСК ФАРМА!")
+                _G.YBAAutoFarmEnabled = forceConfig.autofarm
+                _G.YBAAutoSellEnabled = forceConfig.autosell
+                _G.YBAFarmItems = {}
+                _G.YBASellItems = {}
+                
+                -- Конвертируем массивы в таблицы
+                for _, item in ipairs(forceConfig.farm_items or {}) do
+                    _G.YBAFarmItems[item] = true
+                end
+                for _, item in ipairs(forceConfig.sell_items or {}) do
+                    _G.YBASellItems[item] = true
+                end
+                
+                print("[YBA Enhanced] Конфиг применен:")
+                print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
+                print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
+                print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(_G.YBAFarmItems))
+                print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(_G.YBASellItems))
+            end
+        end
+    end)
+    
     -- НОВОЕ: Проверяем престиж ПЕРЕД всем остальным (с повторной проверкой)
     local prestige = 0
     local prestigeCheckAttempts = 0
@@ -3836,6 +3874,8 @@ function Console.Create()
     miniConsole.BorderSizePixel = 2
     miniConsole.BorderColor3 = Color3.fromRGB(255, 165, 0)
     miniConsole.Visible = false
+    miniConsole.Active = true
+    miniConsole.Draggable = true
     miniConsole.Parent = consoleGui
     
     local miniLabel = Instance.new("TextLabel")
@@ -3848,20 +3888,12 @@ function Console.Create()
     miniLabel.Font = Enum.Font.SourceSansBold
     miniLabel.Parent = miniConsole
     
-    -- Делаем мини-консоль кликабельной И драгабельной
     local miniBtn = Instance.new("TextButton")
     miniBtn.Name = "ClickArea"
     miniBtn.Size = UDim2.new(1, 0, 1, 0)
     miniBtn.BackgroundTransparency = 1
     miniBtn.Text = ""
-    miniBtn.Active = true
-    miniBtn.Draggable = true  -- КРИТИЧНО: Драг через кнопку
     miniBtn.Parent = miniConsole
-    
-    -- КРИТИЧНО: Синхронизируем позицию Frame с кнопкой
-    miniBtn:GetPropertyChangedSignal("Position"):Connect(function()
-        miniConsole.Position = miniBtn.Position
-    end)
     
     -- Логика сворачивания/разворачивания
     minimizeBtn.MouseButton1Click:Connect(function()
