@@ -2959,6 +2959,14 @@ local function DestroyAllFunctions()
     
     print("[YBA Enhanced] Все функции остановлены")
     
+    -- КРИТИЧНО: Удаляем консоль
+    pcall(function()
+        if Console and Console.Destroy then
+            Console.Destroy()
+            print("[YBA Enhanced] Консоль удалена")
+        end
+    end)
+    
     -- Cleanup ESP completely
     pcall(function()
         ESPSettings.Enabled = false
@@ -3642,12 +3650,23 @@ function Console.Create()
         Console.Destroy()
     end)
     
+    -- ScrollingFrame для скроллинга
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "ScrollFrame"
+    scrollFrame.Size = UDim2.new(1, -10, 1, -75)
+    scrollFrame.Position = UDim2.new(0, 5, 0, 35)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = consoleFrame
+    
     -- Output TextBox (SELECTABLE)
     consoleOutput = Instance.new("TextBox")
     consoleOutput.Name = "Output"
-    consoleOutput.Size = UDim2.new(1, -10, 1, -75)
-    consoleOutput.Position = UDim2.new(0, 5, 0, 35)
-    consoleOutput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    consoleOutput.Size = UDim2.new(1, -8, 1, 0)
+    consoleOutput.Position = UDim2.new(0, 0, 0, 0)
+    consoleOutput.BackgroundTransparency = 1
     consoleOutput.BorderSizePixel = 0
     consoleOutput.Text = ""
     consoleOutput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -3659,7 +3678,7 @@ function Console.Create()
     consoleOutput.MultiLine = true
     consoleOutput.ClearTextOnFocus = false
     consoleOutput.TextEditable = false
-    consoleOutput.Parent = consoleFrame
+    consoleOutput.Parent = scrollFrame
     
     -- Input Box
     consoleInput = Instance.new("TextBox")
@@ -3710,16 +3729,36 @@ function Console.AddLog(text, color)
     
     consoleOutput.Text = consoleOutput.Text .. newLine
     
-    -- Auto-scroll to bottom
+    -- Обновляем размер Canvas для скроллинга
     task.spawn(function()
         task.wait(0.01)
-        consoleOutput.CursorPosition = #consoleOutput.Text
+        local textService = game:GetService("TextService")
+        local textBounds = textService:GetTextSize(
+            consoleOutput.Text,
+            consoleOutput.TextSize,
+            consoleOutput.Font,
+            Vector2.new(consoleOutput.AbsoluteSize.X, math.huge)
+        )
+        
+        local scrollFrame = consoleOutput.Parent
+        if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 10)
+            -- Auto-scroll to bottom
+            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.CanvasSize.Y.Offset)
+        end
     end)
 end
 
 function Console.Clear()
     if not consoleOutput then return end
     consoleOutput.Text = ""
+    
+    -- Сбрасываем размер Canvas
+    local scrollFrame = consoleOutput.Parent
+    if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scrollFrame.CanvasPosition = Vector2.new(0, 0)
+    end
 end
 
 function Console.Destroy()
@@ -3730,6 +3769,7 @@ function Console.Destroy()
         consoleOutput = nil
         consoleInput = nil
         consoleEnabled = false
+        print("[YBA Enhanced] Консоль закрыта")
     end
 end
 
