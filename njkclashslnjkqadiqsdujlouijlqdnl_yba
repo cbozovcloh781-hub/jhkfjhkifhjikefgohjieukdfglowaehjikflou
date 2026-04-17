@@ -4025,14 +4025,53 @@ function Console.AddLog(text, color)
     local escapedText = escapeRichText(text)
     local escapedTimestamp = escapeRichText(timestamp)
     
+    -- КРИТИЧНО: Проверяем длину текста ПЕРЕД добавлением
+    local newPlainText = timestamp .. text .. "\n"
+    local newColoredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
+    
+    -- Если текст превысит лимит - очищаем старые логи (оставляем последние 50%)
+    if #consoleOutput.Text + #newPlainText > 180000 then
+        local lines = {}
+        for line in consoleOutput.Text:gmatch("[^\n]+") do
+            table.insert(lines, line)
+        end
+        
+        -- Оставляем только последние 50% строк
+        local halfPoint = math.floor(#lines / 2)
+        local newText = ""
+        for i = halfPoint, #lines do
+            newText = newText .. lines[i] .. "\n"
+        end
+        
+        consoleOutput.Text = newText
+        print("[Console] Автоочистка: удалено " .. halfPoint .. " старых строк")
+    end
+    
     -- НОВОЕ: Добавляем ЧИСТЫЙ текст в TextBox (для копирования)
-    consoleOutput.Text = consoleOutput.Text .. timestamp .. text .. "\n"
+    consoleOutput.Text = consoleOutput.Text .. newPlainText
     
     -- НОВОЕ: Добавляем ЦВЕТНОЙ текст в TextLabel (для отображения)
-    local coloredDisplay = consoleOutput.Parent:FindFirstChild("ColoredDisplay")
-    if coloredDisplay then
-        local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
-        coloredDisplay.Text = coloredDisplay.Text .. coloredText
+    if consoleOutput.Parent and consoleOutput.Parent:IsA("ScrollingFrame") then
+        local coloredDisplay = consoleOutput.Parent:FindFirstChild("ColoredDisplay")
+        if coloredDisplay then
+            -- Проверяем длину цветного текста
+            if #coloredDisplay.Text + #newColoredText > 180000 then
+                local lines = {}
+                for line in coloredDisplay.Text:gmatch("[^\n]+") do
+                    table.insert(lines, line)
+                end
+                
+                local halfPoint = math.floor(#lines / 2)
+                local newText = ""
+                for i = halfPoint, #lines do
+                    newText = newText .. lines[i] .. "\n"
+                end
+                
+                coloredDisplay.Text = newText
+            end
+            
+            coloredDisplay.Text = coloredDisplay.Text .. newColoredText
+        end
     end
     
     -- КРИТИЧНО: Обновляем CanvasSize ТОЛЬКО если пользователь НЕ взаимодействует с консолью
