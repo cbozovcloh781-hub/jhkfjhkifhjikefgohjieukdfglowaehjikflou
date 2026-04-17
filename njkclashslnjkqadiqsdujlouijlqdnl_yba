@@ -35,18 +35,38 @@ task.spawn(function()
         return
     end
     
-    -- НОВОЕ: Проверяем престиж ПЕРЕД всем остальным
+    -- НОВОЕ: Проверяем престиж ПЕРЕД всем остальным (с повторной проверкой)
     local prestige = 0
-    pcall(function()
-        local playerStats = player:WaitForChild("PlayerStats", 5)
-        if playerStats then
-            local prestigeValue = playerStats:FindFirstChild("Prestige")
-            if prestigeValue then
-                prestige = prestigeValue.Value or 0
-                print("[YBA Enhanced] Престиж игрока: " .. prestige)
+    local prestigeCheckAttempts = 0
+    local maxPrestigeChecks = 10
+    
+    while prestigeCheckAttempts < maxPrestigeChecks do
+        prestigeCheckAttempts = prestigeCheckAttempts + 1
+        
+        local success = pcall(function()
+            local playerStats = player:WaitForChild("PlayerStats", 2)
+            if playerStats then
+                local prestigeValue = playerStats:FindFirstChild("Prestige")
+                if prestigeValue then
+                    prestige = prestigeValue.Value or 0
+                    print("[YBA Enhanced] Престиж игрока: " .. prestige .. " (попытка " .. prestigeCheckAttempts .. ")")
+                    return true
+                end
             end
+            return false
+        end)
+        
+        if success and prestige > 0 then
+            print("[YBA Enhanced] Престиж подтвержден: " .. prestige)
+            break
         end
-    end)
+        
+        task.wait(0.5)
+    end
+    
+    if prestige == 0 and prestigeCheckAttempts >= maxPrestigeChecks then
+        print("[YBA Enhanced] ВНИМАНИЕ: Престиж не определен за " .. maxPrestigeChecks .. " попыток! Используем престиж = 0")
+    end
     
     -- КРИТИЧНО: Ждем исчезновения LoadingScreen1 ПЕРЕД нажатием Play
     print("[YBA Enhanced] Ожидание исчезновения LoadingScreen1...")
@@ -78,25 +98,63 @@ task.spawn(function()
     local playButton = nil
     local buttonPath = ""
     
-    -- НОВОЕ: Выбираем кнопку в зависимости от престижа
-    if prestige >= 1 then
-        -- Престиж есть - нажимаем кнопку в меню геймодов
-        print("[YBA Enhanced] Престиж >= 1, ищем кнопку в Gamemodes...")
-        local gamemodes = frames:WaitForChild("Gamemodes", 10)
-        if gamemodes then
-            local mainGame = gamemodes:WaitForChild("MainGame", 10)
-            if mainGame then
-                playButton = mainGame:WaitForChild("Play", 10)
-                buttonPath = "LoadingScreen.Frames.Gamemodes.MainGame.Play"
+    -- НОВОЕ: Выбираем кнопку в зависимости от престижа (с ПОВТОРНОЙ проверкой)
+    local buttonSearchAttempts = 0
+    local maxButtonSearchAttempts = 5
+    
+    while not playButton and buttonSearchAttempts < maxButtonSearchAttempts do
+        buttonSearchAttempts = buttonSearchAttempts + 1
+        print("[YBA Enhanced] Попытка поиска кнопки " .. buttonSearchAttempts .. "/" .. maxButtonSearchAttempts)
+        
+        -- КРИТИЧНО: Повторно проверяем престиж перед каждой попыткой
+        pcall(function()
+            local playerStats = player:WaitForChild("PlayerStats", 1)
+            if playerStats then
+                local prestigeValue = playerStats:FindFirstChild("Prestige")
+                if prestigeValue then
+                    local newPrestige = prestigeValue.Value or 0
+                    if newPrestige ~= prestige then
+                        print("[YBA Enhanced] ОБНОВЛЕНИЕ: Престиж изменился с " .. prestige .. " на " .. newPrestige)
+                        prestige = newPrestige
+                    end
+                end
             end
+        end)
+        
+        if prestige >= 1 then
+            -- Престиж есть - нажимаем кнопку в меню геймодов
+            print("[YBA Enhanced] Престиж >= 1, ищем кнопку в Gamemodes...")
+            pcall(function()
+                local gamemodes = frames:FindFirstChild("Gamemodes")
+                if gamemodes then
+                    local mainGame = gamemodes:FindFirstChild("MainGame")
+                    if mainGame then
+                        playButton = mainGame:FindFirstChild("Play")
+                        if playButton then
+                            buttonPath = "LoadingScreen.Frames.Gamemodes.MainGame.Play"
+                            print("[YBA Enhanced] Кнопка найдена в Gamemodes!")
+                        end
+                    end
+                end
+            end)
+        else
+            -- Престижа нет - нажимаем обычную кнопку
+            print("[YBA Enhanced] Престиж = 0, ищем кнопку в Main...")
+            pcall(function()
+                local main = frames:FindFirstChild("Main")
+                if main then
+                    playButton = main:FindFirstChild("Play")
+                    if playButton then
+                        buttonPath = "LoadingScreen.Frames.Main.Play"
+                        print("[YBA Enhanced] Кнопка найдена в Main!")
+                    end
+                end
+            end)
         end
-    else
-        -- Престижа нет - нажимаем обычную кнопку
-        print("[YBA Enhanced] Престиж = 0, ищем кнопку в Main...")
-        local main = frames:WaitForChild("Main", 10)
-        if main then
-            playButton = main:WaitForChild("Play", 10)
-            buttonPath = "LoadingScreen.Frames.Main.Play"
+        
+        if not playButton then
+            print("[YBA Enhanced] Кнопка не найдена, ждем 1 секунду...")
+            task.wait(1)
         end
     end
     
@@ -3681,6 +3739,55 @@ function Console.Create()
         Console.Destroy()
     end)
     
+    -- НОВОЕ: Кнопка копирования (без RichText тегов)
+    local copyBtn = Instance.new("TextButton")
+    copyBtn.Name = "CopyButton"
+    copyBtn.Size = UDim2.new(0, 60, 0, 30)
+    copyBtn.Position = UDim2.new(1, -95, 0, 0)
+    copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+    copyBtn.BorderSizePixel = 0
+    copyBtn.Text = "Copy"
+    copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    copyBtn.TextSize = 12
+    copyBtn.Font = Enum.Font.SourceSansBold
+    copyBtn.Parent = titleBar
+    
+    copyBtn.MouseButton1Click:Connect(function()
+        -- Удаляем все RichText теги
+        local plainText = consoleOutput.Text:gsub("<[^>]+>", "")
+        -- Декодируем HTML сущности
+        plainText = plainText:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&")
+        
+        -- Копируем в буфер обмена
+        pcall(function()
+            setclipboard(plainText)
+        end)
+        
+        -- Визуальная обратная связь
+        copyBtn.Text = "Copied!"
+        copyBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
+        task.wait(1)
+        copyBtn.Text = "Copy"
+        copyBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+    end)
+    
+    -- НОВОЕ: Кнопка очистки
+    local clearBtn = Instance.new("TextButton")
+    clearBtn.Name = "ClearButton"
+    clearBtn.Size = UDim2.new(0, 60, 0, 30)
+    clearBtn.Position = UDim2.new(1, -160, 0, 0)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+    clearBtn.BorderSizePixel = 0
+    clearBtn.Text = "Clear"
+    clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    clearBtn.TextSize = 12
+    clearBtn.Font = Enum.Font.SourceSansBold
+    clearBtn.Parent = titleBar
+    
+    clearBtn.MouseButton1Click:Connect(function()
+        Console.Clear()
+    end)
+    
     -- ScrollingFrame для скроллинга
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Name = "ScrollFrame"
@@ -3697,7 +3804,7 @@ function Console.Create()
     -- Output TextBox (SELECTABLE + SCROLLABLE)
     consoleOutput = Instance.new("TextBox")
     consoleOutput.Name = "Output"
-    consoleOutput.Size = UDim2.new(1, -10, 1, 0)
+    consoleOutput.Size = UDim2.new(1, -10, 1, 0)  -- ИСПРАВЛЕНО: Убрана AutomaticSize
     consoleOutput.Position = UDim2.new(0, 0, 0, 0)
     consoleOutput.BackgroundTransparency = 1
     consoleOutput.BorderSizePixel = 0
@@ -3712,7 +3819,6 @@ function Console.Create()
     consoleOutput.MultiLine = true
     consoleOutput.ClearTextOnFocus = false
     consoleOutput.TextEditable = false
-    consoleOutput.AutomaticSize = Enum.AutomaticSize.Y
     consoleOutput.Parent = scrollFrame
     
     -- Input Box
@@ -3801,21 +3907,39 @@ function Console.AddLog(text, color)
     local coloredText = '<font color="#969696">' .. escapedTimestamp .. '</font><font color="' .. colorHex .. '">' .. escapedText .. '</font>\n'
     consoleOutput.Text = consoleOutput.Text .. coloredText
     
-    -- КРИТИЧНО: Обновляем CanvasSize после добавления текста
+    -- КРИТИЧНО: Обновляем CanvasSize ТОЛЬКО если пользователь НЕ взаимодействует с консолью
     task.spawn(function()
-        task.wait(0.05)
+        task.wait(0.1)  -- УВЕЛИЧЕНА задержка с 0.05 до 0.1
         if not consoleOutput then return end
+        
         local scrollFrame = consoleOutput.Parent
-        if scrollFrame and scrollFrame:IsA("ScrollingFrame") and consoleOutput.AbsoluteSize then
-            -- Устанавливаем CanvasSize равным высоте TextBox
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, consoleOutput.AbsoluteSize.Y + 20)
-            -- ИСПРАВЛЕНО: Автоскролл только если уже был внизу (не при открытии)
-            if scrollFrame.AbsoluteCanvasSize and scrollFrame.AbsoluteWindowSize then
-                local maxScroll = scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y
-                local currentScroll = scrollFrame.CanvasPosition.Y
-                -- Скроллим вниз только если уже были близко к низу (в пределах 50 пикселей)
-                if maxScroll - currentScroll < 50 then
-                    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+        if scrollFrame and scrollFrame:IsA("ScrollingFrame") then
+            -- НОВОЕ: Проверяем фокус на TextBox (пользователь выделяет текст)
+            local userInteracting = consoleOutput:IsFocused() or game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            
+            if not userInteracting then
+                -- ИСПРАВЛЕНО: Рассчитываем высоту текста вручную
+                local textService = game:GetService("TextService")
+                local textBounds = textService:GetTextSize(
+                    consoleOutput.Text,
+                    consoleOutput.TextSize,
+                    consoleOutput.Font,
+                    Vector2.new(scrollFrame.AbsoluteSize.X - 20, math.huge)
+                )
+                
+                local textHeight = textBounds.Y + 20  -- +20 для отступа
+                
+                -- Устанавливаем CanvasSize равным высоте текста
+                scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight)
+                
+                -- Автоскролл только если уже был внизу
+                if scrollFrame.AbsoluteCanvasSize and scrollFrame.AbsoluteWindowSize then
+                    local maxScroll = scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y
+                    local currentScroll = scrollFrame.CanvasPosition.Y
+                    -- Скроллим вниз только если уже были близко к низу (в пределах 100 пикселей)
+                    if maxScroll - currentScroll < 100 then
+                        scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+                    end
                 end
             end
         end
