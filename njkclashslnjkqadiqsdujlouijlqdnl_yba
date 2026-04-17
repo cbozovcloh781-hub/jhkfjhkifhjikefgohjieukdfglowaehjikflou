@@ -330,21 +330,30 @@ task.spawn(function()
             print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
         end
         
-        if Options.FarmItems and Settings.FarmItems then
-            Options.FarmItems:SetValue(Settings.FarmItems)
+        -- ИСПРАВЛЕНО: Сохраняем значения ПЕРЕД SetValue
+        local savedFarmItems = _G.YBAFarmItems
+        local savedSellItems = _G.YBASellItems
+        
+        if Options.FarmItems and savedFarmItems then
+            -- КРИТИЧНО: SetValue вызывает Callback который ПЕРЕЗАПИСЫВАЕТ Settings!
+            Options.FarmItems:SetValue(savedFarmItems)
             print("[YBA Enhanced] FarmItems установлены в UI")
-            -- КРИТИЧНО: Обновляем Settings вручную т.к. SetValue НЕ вызывает Callback!
-            Settings.FarmItems = _G.YBAFarmItems
-            print("[YBA Enhanced] Settings.FarmItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+            -- ИСПРАВЛЕНО: Восстанавливаем Settings ПОСЛЕ SetValue
+            task.wait(0.1)
+            Settings.FarmItems = savedFarmItems
+            print("[YBA Enhanced] Settings.FarmItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.FarmItems не найден!")
         end
-        if Options.SellItems and Settings.SellItems then
-            Options.SellItems:SetValue(Settings.SellItems)
+        
+        if Options.SellItems and savedSellItems then
+            -- КРИТИЧНО: SetValue вызывает Callback который ПЕРЕЗАПИСЫВАЕТ Settings!
+            Options.SellItems:SetValue(savedSellItems)
             print("[YBA Enhanced] SellItems установлены в UI")
-            -- КРИТИЧНО: Обновляем Settings вручную т.к. SetValue НЕ вызывает Callback!
-            Settings.SellItems = _G.YBASellItems
-            print("[YBA Enhanced] Settings.SellItems обновлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+            -- ИСПРАВЛЕНО: Восстанавливаем Settings ПОСЛЕ SetValue
+            task.wait(0.1)
+            Settings.SellItems = savedSellItems
+            print("[YBA Enhanced] Settings.SellItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
             print("[YBA Enhanced] ОШИБКА: Options.SellItems не найден!")
         end
@@ -393,8 +402,32 @@ task.spawn(function()
             print("[YBA Enhanced]   Settings.Autofarm = " .. tostring(Settings.Autofarm))
             print("[YBA Enhanced]   Settings.FarmItems = " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems or {}))
             
+            -- ИСПРАВЛЕНО: Проверяем что FarmItems НЕ пустой И содержит хотя бы один выбранный предмет
+            local hasSelectedItems = false
+            if Settings.FarmItems and type(Settings.FarmItems) == "table" then
+                for item, isSelected in pairs(Settings.FarmItems) do
+                    if isSelected then
+                        hasSelectedItems = true
+                        print("[YBA Enhanced]   Выбран предмет: " .. item)
+                        break
+                    end
+                end
+            end
+            
+            if not hasSelectedItems then
+                print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Settings.FarmItems пустой или нет выбранных предметов!")
+                print("[YBA Enhanced] Попытка восстановления из _G.YBAFarmItems...")
+                if _G.YBAFarmItems and next(_G.YBAFarmItems) then
+                    Settings.FarmItems = _G.YBAFarmItems
+                    print("[YBA Enhanced] Settings.FarmItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+                    hasSelectedItems = true
+                else
+                    print("[YBA Enhanced] ОШИБКА: _G.YBAFarmItems тоже пустой!")
+                end
+            end
+            
             if StartAutofarm then
-                if Settings.FarmItems and next(Settings.FarmItems) then
+                if hasSelectedItems then
                     StartAutofarm()
                     print("[YBA Enhanced] StartAutofarm() выполнен успешно")
                 else
@@ -462,8 +495,32 @@ task.spawn(function()
             print("[YBA Enhanced]   Settings.Autosell = " .. tostring(Settings.Autosell))
             print("[YBA Enhanced]   Settings.SellItems = " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
             
+            -- ИСПРАВЛЕНО: Проверяем что SellItems НЕ пустой И содержит хотя бы один выбранный предмет
+            local hasSelectedItems = false
+            if Settings.SellItems and type(Settings.SellItems) == "table" then
+                for item, isSelected in pairs(Settings.SellItems) do
+                    if isSelected then
+                        hasSelectedItems = true
+                        print("[YBA Enhanced]   Выбран предмет: " .. item)
+                        break
+                    end
+                end
+            end
+            
+            if not hasSelectedItems then
+                print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Settings.SellItems пустой или нет выбранных предметов!")
+                print("[YBA Enhanced] Попытка восстановления из _G.YBASellItems...")
+                if _G.YBASellItems and next(_G.YBASellItems) then
+                    Settings.SellItems = _G.YBASellItems
+                    print("[YBA Enhanced] Settings.SellItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+                    hasSelectedItems = true
+                else
+                    print("[YBA Enhanced] ОШИБКА: _G.YBASellItems тоже пустой!")
+                end
+            end
+            
             if StartAutosell then
-                if Settings.SellItems and next(Settings.SellItems) then
+                if hasSelectedItems then
                     StartAutosell()
                     print("[YBA Enhanced] StartAutosell() выполнен успешно")
                 else
