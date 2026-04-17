@@ -2593,7 +2593,7 @@ local function StartCommandHandler()
                     lucky_arrows = luckyArrows,
                     lucky_masks = luckyMasks,
                     current_account = game.Players.LocalPlayer.Name,
-                    server_hops = farmStats.serverHops,
+                    server_hops = farmStats.serverHops or 0,  -- ИСПРАВЛЕНО: Всегда отправляем server_hops
                     items_collected_delta = itemsCollectedDelta,
                     items_sold_delta = itemsSoldDelta,
                     money_collected_delta = moneyCollectedDelta,
@@ -2740,6 +2740,11 @@ local function CreateESP(player)
     if Drawings.ESP[player] then RemoveESP(player) end
     
     local success, err = pcall(function()
+        -- КРИТИЧНО: Проверяем что Drawing.new существует
+        if not Drawing or not Drawing.new then
+            return
+        end
+        
         local box = {TopLeft = Drawing.new("Line"), TopRight = Drawing.new("Line"), BottomLeft = Drawing.new("Line"), BottomRight = Drawing.new("Line"), Left = Drawing.new("Line"), Right = Drawing.new("Line"), Top = Drawing.new("Line"), Bottom = Drawing.new("Line")}
         for _, line in pairs(box) do if line then line.Visible = false line.Color = Colors.Enemy line.Thickness = ESPSettings.BoxThickness if line == box.Fill then line.Filled = true line.Transparency = ESPSettings.BoxFillTransparency end end end
         
