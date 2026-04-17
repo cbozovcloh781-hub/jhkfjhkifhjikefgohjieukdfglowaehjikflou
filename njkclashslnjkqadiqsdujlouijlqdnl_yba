@@ -511,6 +511,9 @@ local DefaultSettings = {
     -- Camera
     UnlockZoom = false,
     
+    -- Console
+    CustomConsole = false,
+    
     -- Money Farm
     MoneyFarmEnabled = false,
     MoneyLimit = 1000000,
@@ -3455,278 +3458,17 @@ TeleportTab:AddButton({
     end
 })
 
--- Console variables
+-- Загружаем DEX Console модуль
+local Console = loadstring(game:HttpGet("https://raw.githubusercontent.com/yourusername/yourrepo/main/console.lua"))() or loadfile("E:\\folders\\codes\\roblox\\games\\yba\\console.lua")()
+
 local consoleEnabled = false
-local consoleGui = nil
-local consoleFrame = nil
-local consoleOutput = nil
-local consoleInput = nil
-local consoleConnections = {}
-
--- Console Functions
-local function CreateConsole()
-    if consoleGui then return end
-    
-    consoleGui = Instance.new("ScreenGui")
-    consoleGui.Name = "CustomConsole"
-    consoleGui.Parent = CoreGui
-    
-    consoleFrame = Instance.new("Frame")
-    consoleFrame.Size = UDim2.new(0, 600, 0, 400)
-    consoleFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-    consoleFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-    consoleFrame.BorderSizePixel = 2
-    consoleFrame.BorderColor3 = Color3.new(1, 1, 1)
-    consoleFrame.Active = true
-    consoleFrame.Draggable = true
-    consoleFrame.Parent = consoleGui
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 30)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    title.Text = "SOSALKIN CONSOLE"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.TextSize = 16
-    title.Font = Enum.Font.GothamBold
-    title.Parent = consoleFrame
-    
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 30, 0, 30)
-    closeBtn.Position = UDim2.new(1, -30, 0, 0)
-    closeBtn.BackgroundColor3 = Color3.new(0.8, 0, 0)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.new(1, 1, 1)
-    closeBtn.TextSize = 14
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.Parent = consoleFrame
-    
-
-    
-    consoleOutput = Instance.new("ScrollingFrame")
-    consoleOutput.Size = UDim2.new(1, -10, 1, -70)
-    consoleOutput.Position = UDim2.new(0, 5, 0, 35)
-    consoleOutput.BackgroundColor3 = Color3.new(0.05, 0.05, 0.05)
-    consoleOutput.BorderSizePixel = 1
-    consoleOutput.BorderColor3 = Color3.new(0.3, 0.3, 0.3)
-    consoleOutput.ScrollBarThickness = 8
-    consoleOutput.SelectionImageObject = nil
-    consoleOutput.Parent = consoleFrame
-    
-    local outputList = Instance.new("UIListLayout")
-    outputList.SortOrder = Enum.SortOrder.LayoutOrder
-    outputList.Parent = consoleOutput
-    
-    consoleInput = Instance.new("TextBox")
-    consoleInput.Size = UDim2.new(1, -10, 0, 25)
-    consoleInput.Position = UDim2.new(0, 5, 1, -30)
-    consoleInput.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    consoleInput.BorderSizePixel = 1
-    consoleInput.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
-    consoleInput.Text = ""
-    consoleInput.PlaceholderText = "Enter command..."
-    consoleInput.TextColor3 = Color3.new(1, 1, 1)
-    consoleInput.TextSize = 14
-    consoleInput.Font = Enum.Font.Gotham
-    consoleInput.TextXAlignment = Enum.TextXAlignment.Left
-    consoleInput.Parent = consoleFrame
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        consoleEnabled = false
-        if consoleGui then
-            consoleGui:Destroy()
-            consoleGui = nil
-        end
-    end)
-    
-    consoleInput.FocusLost:Connect(function(enterPressed)
-        if enterPressed and consoleInput.Text ~= "" then
-            pcall(function()
-                ExecuteCommand(consoleInput.Text)
-            end)
-            consoleInput.Text = ""
-        end
-    end)
-end
-
-local function DestroyConsole()
-    pcall(function()
-        if consoleGui then
-            consoleGui:Destroy()
-            consoleGui = nil
-            consoleFrame = nil
-            consoleOutput = nil
-            consoleInput = nil
-        end
-    end)
-    
-    for _, connection in pairs(consoleConnections) do
-        pcall(function()
-            if connection and typeof(connection) == "RBXScriptConnection" then
-                connection:Disconnect()
-            end
-        end)
-    end
-    consoleConnections = {}
-end
-
-local function AddConsoleLog(text, color)
-    if not consoleOutput then return end
-    
-    local logLabel = Instance.new("TextLabel")
-    logLabel.Size = UDim2.new(1, -10, 0, 20)
-    logLabel.BackgroundTransparency = 1
-    logLabel.Text = "[" .. os.date("%H:%M:%S") .. "] " .. text
-    logLabel.TextColor3 = color or Color3.new(1, 1, 1)
-    logLabel.TextSize = 12
-    logLabel.Font = Enum.Font.Gotham
-    logLabel.TextXAlignment = Enum.TextXAlignment.Left
-    logLabel.TextWrapped = true
-    logLabel.Parent = consoleOutput
-    
-    local layout = consoleOutput:FindFirstChild("UIListLayout")
-    if layout then
-        consoleOutput.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-        consoleOutput.CanvasPosition = Vector2.new(0, consoleOutput.CanvasSize.Y.Offset)
-    end
-end
-
-local function ExecuteCommand(command)
-    AddConsoleLog("> " .. command, Color3.new(0, 1, 0))
-    
-    local args = command:split(" ")
-    local cmd = args[1]:lower()
-    
-    if cmd == "help" then
-        AddConsoleLog("Available commands:", Color3.new(1, 1, 0))
-        AddConsoleLog("help - Show this help", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("clear - Clear console", Color3.new(0.8, 0.8, 0.8))
-
-        AddConsoleLog("tp [x] [y] [z] - Teleport to coordinates", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("speed [value] - Set walk speed", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("fly [on/off] - Toggle fly", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("noclip [on/off] - Toggle noclip", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("testdialogue [option] [dialogue] - Test Merchant dialogue", Color3.new(0.8, 0.8, 0.8))
-        AddConsoleLog("lua [code] - Execute Lua code", Color3.new(0.8, 0.8, 0.8))
-    elseif cmd == "clear" then
-        for _, child in pairs(consoleOutput:GetChildren()) do
-            if child:IsA("TextLabel") then
-                child:Destroy()
-            end
-        end
-
-    elseif cmd == "tp" and #args >= 4 then
-        local x, y, z = tonumber(args[2]), tonumber(args[3]), tonumber(args[4])
-        if x and y and z then
-            local character = Player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                character.HumanoidRootPart.CFrame = CFrame.new(x, y, z)
-                AddConsoleLog("Teleported to " .. x .. ", " .. y .. ", " .. z, Color3.new(0, 1, 1))
-            end
-        else
-            AddConsoleLog("Invalid coordinates", Color3.new(1, 0, 0))
-        end
-    elseif cmd == "speed" and #args >= 2 then
-        local speed = tonumber(args[2])
-        if speed then
-            local character = Player.Character
-            if character and character:FindFirstChild("Humanoid") then
-                character.Humanoid.WalkSpeed = speed
-                AddConsoleLog("Speed set to " .. speed, Color3.new(0, 1, 1))
-            end
-        else
-            AddConsoleLog("Invalid speed value", Color3.new(1, 0, 0))
-        end
-    elseif cmd == "fly" and #args >= 2 then
-        local state = args[2]:lower()
-        if state == "on" then
-            StartFly()
-            AddConsoleLog("Fly enabled", Color3.new(0, 1, 1))
-        elseif state == "off" then
-            StopFly()
-            AddConsoleLog("Fly disabled", Color3.new(0, 1, 1))
-        end
-    elseif cmd == "noclip" and #args >= 2 then
-        local state = args[2]:lower()
-        if state == "on" then
-            StartNoClip()
-            AddConsoleLog("NoClip enabled", Color3.new(0, 1, 1))
-        elseif state == "off" then
-            StopNoClip()
-            AddConsoleLog("NoClip disabled", Color3.new(0, 1, 1))
-        end
-    elseif cmd == "testdialogue" and #args >= 3 then
-        local option = args[2]
-        local dialogue = args[3]
-        local character = Player.Character
-        if character and character:FindFirstChild("RemoteEvent") then
-            local args = {
-                [1] = "EndDialogue",
-                [2] = {
-                    ["NPC"] = "Merchant",
-                    ["Option"] = option,
-                    ["Dialogue"] = dialogue
-                }
-            }
-            character.RemoteEvent:FireServer(unpack(args))
-            AddConsoleLog("Sent: Option=" .. option .. ", Dialogue=" .. dialogue, Color3.new(0, 1, 1))
-        else
-            AddConsoleLog("Character or RemoteEvent not found", Color3.new(1, 0, 0))
-        end
-    elseif cmd == "lua" and #args >= 2 then
-        local code = command:sub(5)
-        local success, result = pcall(function()
-            return loadstring(code)()
-        end)
-        if success then
-            AddConsoleLog("Executed: " .. tostring(result), Color3.new(0, 1, 1))
-        else
-            AddConsoleLog("Error: " .. tostring(result), Color3.new(1, 0, 0))
-        end
-    else
-        AddConsoleLog("Unknown command. Type 'help' for available commands.", Color3.new(1, 0, 0))
-    end
-end
 
 local function StartConsole()
     if consoleEnabled then return end
     consoleEnabled = true
     
     pcall(function()
-        CreateConsole()
-    end)
-    
-    -- Hook into game logs
-    pcall(function()
-        consoleConnections.logService = game:GetService("LogService").MessageOut:Connect(function(message, messageType)
-            if not consoleEnabled then return end
-            
-            local color = Color3.new(1, 1, 1)
-            if messageType == Enum.MessageType.MessageError then
-                color = Color3.new(1, 0, 0)
-            elseif messageType == Enum.MessageType.MessageWarning then
-                color = Color3.new(1, 1, 0)
-            elseif messageType == Enum.MessageType.MessageInfo then
-                color = Color3.new(0, 1, 1)
-            end
-            
-            AddConsoleLog(message, color)
-        end)
-    end)
-    
-    -- Hook into script errors
-    pcall(function()
-        consoleConnections.scriptContext = game:GetService("ScriptContext").Error:Connect(function(message, stack, script)
-            if not consoleEnabled then return end
-            AddConsoleLog("SCRIPT ERROR: " .. message, Color3.new(1, 0, 0))
-            if stack and stack ~= "" then
-                AddConsoleLog("Stack: " .. stack, Color3.new(0.8, 0.4, 0.4))
-            end
-        end)
-    end)
-    
-    pcall(function()
-        AddConsoleLog("Custom console initialized", Color3.new(0, 1, 0))
+        Console.Create()
     end)
 end
 
@@ -3735,7 +3477,7 @@ local function StopConsole()
     consoleEnabled = false
     
     pcall(function()
-        DestroyConsole()
+        Console.Destroy()
     end)
 end
 
@@ -4691,9 +4433,12 @@ SettingsTab:AddToggle("UnlockZoom", {
 
 SettingsTab:AddToggle("CustomConsole", {
     Title = "Custom Console",
-    Description = "Enable custom debug console",
-    Default = false,
+    Description = "Enable custom debug console (auto-opens on script start)",
+    Default = Settings.CustomConsole or false,
     Callback = function(Value)
+        Settings.CustomConsole = Value
+        saveSettings()
+        
         if Value then
             StartConsole()
         else
@@ -4701,6 +4446,15 @@ SettingsTab:AddToggle("CustomConsole", {
         end
     end
 })
+
+-- КРИТИЧНО: Автоматически открываем консоль при запуске если тумблер включен
+if Settings.CustomConsole then
+    task.spawn(function()
+        task.wait(1)
+        StartConsole()
+        print("[YBA Enhanced] Консоль открыта автоматически")
+    end)
+end
 
 SettingsTab:AddButton({
     Title = "Destroy Script",
