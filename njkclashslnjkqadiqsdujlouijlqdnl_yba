@@ -2418,20 +2418,28 @@ local function ExecuteCommand(command, args)
     print("[YBA Enhanced] Выполнение команды: " .. command)
     
     if command == "toggle_autofarm" then
-        if isAutofarmEnabled then
-            StopAutofarm()
-            return {success = true, message = "Автофарм остановлен"}
-        else
+        -- ИСПРАВЛЕНО: Всегда ВКЛЮЧАЕМ автофарм (не переключаем)
+        if not isAutofarmEnabled then
+            Settings.Autofarm = true
+            if Options and Options.Autofarm then
+                Options.Autofarm:SetValue(true)
+            end
             StartAutofarm()
             return {success = true, message = "Автофарм запущен"}
+        else
+            return {success = true, message = "Автофарм уже работает"}
         end
     elseif command == "toggle_autosell" then
-        if isAutosellEnabled then
-            StopAutosell()
-            return {success = true, message = "Автопродажа остановлена"}
-        else
+        -- ИСПРАВЛЕНО: Всегда ВКЛЮЧАЕМ автопродажу (не переключаем)
+        if not isAutosellEnabled then
+            Settings.Autosell = true
+            if Options and Options.Autosell then
+                Options.Autosell:SetValue(true)
+            end
             StartAutosell()
             return {success = true, message = "Автопродажа запущена"}
+        else
+            return {success = true, message = "Автопродажа уже работает"}
         end
     elseif command == "drop_money" then
         local money = GetPlayerMoney()
@@ -3796,9 +3804,14 @@ function Console.AddLog(text, color)
         if scrollFrame and scrollFrame:IsA("ScrollingFrame") and consoleOutput.AbsoluteSize then
             -- Устанавливаем CanvasSize равным высоте TextBox
             scrollFrame.CanvasSize = UDim2.new(0, 0, 0, consoleOutput.AbsoluteSize.Y + 20)
-            -- Auto-scroll to bottom
-            if scrollFrame.AbsoluteCanvasSize then
-                scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+            -- ИСПРАВЛЕНО: Автоскролл только если уже был внизу (не при открытии)
+            if scrollFrame.AbsoluteCanvasSize and scrollFrame.AbsoluteWindowSize then
+                local maxScroll = scrollFrame.AbsoluteCanvasSize.Y - scrollFrame.AbsoluteWindowSize.Y
+                local currentScroll = scrollFrame.CanvasPosition.Y
+                -- Скроллим вниз только если уже были близко к низу (в пределах 50 пикселей)
+                if maxScroll - currentScroll < 50 then
+                    scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+                end
             end
         end
     end)
