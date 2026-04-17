@@ -1082,6 +1082,7 @@ local playerPositions = {}
 local cheaterDetections = {}
 local detectedCheatersCount = 0
 local cheaterDetectionEnabled = false
+local detectedCheaters = {}  -- НОВОЕ: Список обнаруженных читеров
 
 local function StartCheaterDetection()
     if cheaterDetectionEnabled then return end
@@ -1161,6 +1162,9 @@ local function StartCheaterDetection()
                                 if cheaterDetections[player.UserId] >= Settings.CheaterDetectionSensitivity then
                                     detectedCheatersCount = detectedCheatersCount + 1
                                     
+                                    -- НОВОЕ: Добавляем в список читеров
+                                    detectedCheaters[player.UserId] = true
+                                    
                                     Library:Notify({
                                         Title = "Читер обнаружен!",
                                         Content = player.Name .. " использует телепорт (" .. detectedCheatersCount .. "/3)",
@@ -1203,6 +1207,7 @@ local function StopCheaterDetection()
     playerPositions = {}
     cheaterDetections = {}
     detectedCheatersCount = 0
+    detectedCheaters = {}  -- НОВОЕ: Очищаем список читеров
     
     -- КРИТИЧНО: Обновляем _G переменную при остановке детектора
     _G.YBAAutoServerHop = false
@@ -2854,6 +2859,11 @@ local function RemoveESP(player)
 end
 
 local function GetPlayerColor(player, colorType)
+    -- НОВОЕ: Проверяем читер ли это
+    if detectedCheaters[player.UserId] then
+        return Color3.fromRGB(255, 165, 0)  -- Оранжевый для читеров
+    end
+    
     if ESPSettings.RainbowEnabled then
         if colorType == "box" and ESPSettings.RainbowBoxes and ESPSettings.BoxESP then return Colors.Rainbow end
         if colorType == "tracer" and ESPSettings.RainbowTracers and ESPSettings.TracerESP then return Colors.Rainbow end
@@ -2961,8 +2971,36 @@ local function UpdateESP(player)
         esp.HealthBar.Outline.Size = Vector2.new(barWidth, barHeight) esp.HealthBar.Outline.Position = barPos esp.HealthBar.Outline.Visible = true esp.HealthBar.Fill.Size = Vector2.new(barWidth - 2, barHeight * healthPercent) esp.HealthBar.Fill.Position = Vector2.new(barPos.X + 1, barPos.Y + barHeight * (1-healthPercent)) esp.HealthBar.Fill.Color = Color3.fromRGB(255 - (255 * healthPercent), 255 * healthPercent, 0) esp.HealthBar.Fill.Visible = true
         if ESPSettings.HealthStyle == "Both" or ESPSettings.HealthStyle == "Text" then esp.HealthBar.Text.Text = math.floor(health) .. "HP" esp.HealthBar.Text.Position = Vector2.new(barPos.X + barWidth + 2, barPos.Y + barHeight/2) esp.HealthBar.Text.Visible = true else esp.HealthBar.Text.Visible = false end
     else for _, obj in pairs(esp.HealthBar) do obj.Visible = false end end
-    if ESPSettings.NameESP then esp.Info.Name.Text = player.DisplayName esp.Info.Name.Position = Vector2.new(boxPosition.X + boxWidth/2, boxPosition.Y - 20) esp.Info.Name.Color = GetPlayerColor(player, "name") esp.Info.Name.Visible = true else esp.Info.Name.Visible = false end
-    local highlight = Highlights[player] if highlight and ESPSettings.ChamsEnabled and character then highlight.Parent = character highlight.FillColor = ESPSettings.ChamsFillColor highlight.OutlineColor = ESPSettings.ChamsOutlineColor highlight.FillTransparency = ESPSettings.ChamsTransparency highlight.OutlineTransparency = ESPSettings.ChamsOutlineTransparency highlight.Enabled = true elseif highlight then highlight.Enabled = false end
+    if ESPSettings.NameESP then 
+        -- НОВОЕ: Добавляем метку [CHEATER] для читеров
+        local nameText = player.DisplayName
+        if detectedCheaters[player.UserId] then
+            nameText = "[CHEATER] " .. nameText
+        end
+        esp.Info.Name.Text = nameText
+        esp.Info.Name.Position = Vector2.new(boxPosition.X + boxWidth/2, boxPosition.Y - 20) 
+        esp.Info.Name.Color = GetPlayerColor(player, "name") 
+        esp.Info.Name.Visible = true 
+    else 
+        esp.Info.Name.Visible = false 
+    end
+    local highlight = Highlights[player] 
+    if highlight and ESPSettings.ChamsEnabled and character then 
+        highlight.Parent = character 
+        -- НОВОЕ: Оранжевый цвет для читеров
+        if detectedCheaters[player.UserId] then
+            highlight.FillColor = Color3.fromRGB(255, 165, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 100, 0)
+        else
+            highlight.FillColor = ESPSettings.ChamsFillColor
+            highlight.OutlineColor = ESPSettings.ChamsOutlineColor
+        end
+        highlight.FillTransparency = ESPSettings.ChamsTransparency 
+        highlight.OutlineTransparency = ESPSettings.ChamsOutlineTransparency 
+        highlight.Enabled = true 
+    elseif highlight then 
+        highlight.Enabled = false 
+    end
     local skeleton = Drawings.Skeleton[player]
     if ESPSettings.SkeletonESP and skeleton then
         local head = character:FindFirstChild("Head")
@@ -3304,13 +3342,16 @@ ESPTab:AddColorpicker("SkeletonColor", {Title = "Skeleton Color", Default = ESPS
 local AutoTab = Window:AddTab({Title = "Autofarm", Icon = "cpu"})
 
 -- === АВТОФАРМ ===
-AutoTab:AddToggle("Autofarm", {
+Options.Autofarm = AutoTab:AddToggle("Autofarm", {
     Title = "🎯 Auto Farm Items",
     Description = "Автоматически собирает выбранные предметы",
     Default = Settings.Autofarm,
     Callback = function(Value)
         Settings.Autofarm = Value
         saveSettings()
+        
+        -- КРИТИЧНО: Обновляем _G переменную
+        _G.YBAAutoFarmEnabled = Value
         
         if Value then
             StartAutofarm()
@@ -3344,13 +3385,16 @@ task.spawn(function()
     end
 end)
 
-AutoTab:AddToggle("Autosell", {
+Options.Autosell = AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
     Description = "Автоматически продает выбранные предметы (лимит $1M)",
     Default = Settings.Autosell,
     Callback = function(Value)
         Settings.Autosell = Value
         saveSettings()
+        
+        -- КРИТИЧНО: Обновляем _G переменную
+        _G.YBAAutoSellEnabled = Value
         
         if Value then
             StartAutosell()
@@ -3762,18 +3806,54 @@ function Console.Create()
     minimizeBtn.Font = Enum.Font.SourceSansBold
     minimizeBtn.Parent = titleBar
     
+    -- НОВОЕ: Кнопка очистки
+    local clearBtn = Instance.new("TextButton")
+    clearBtn.Name = "ClearButton"
+    clearBtn.Size = UDim2.new(0, 50, 0, 30)
+    clearBtn.Position = UDim2.new(1, -120, 0, 0)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    clearBtn.BorderSizePixel = 0
+    clearBtn.Text = "Clear"
+    clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    clearBtn.TextSize = 11
+    clearBtn.Font = Enum.Font.SourceSansBold
+    clearBtn.Parent = titleBar
+    
+    clearBtn.MouseButton1Click:Connect(function()
+        Console.Clear()
+    end)
+    
     -- Создаем мини-версию консоли (свернутая)
     local miniConsole = Instance.new("Frame")
     miniConsole.Name = "MiniConsole"
-    miniConsole.Size = UDim2.new(0, 150, 0, 40)
-    miniConsole.Position = UDim2.new(0.5, -75, 0.9, -20)
+    miniConsole.Size = UDim2.new(0, 100, 0, 30)
+    miniConsole.Position = UDim2.new(0.5, -50, 0.9, -15)
     miniConsole.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     miniConsole.BorderSizePixel = 2
     miniConsole.BorderColor3 = Color3.fromRGB(255, 165, 0)
-    miniConsole.Active = true
-    miniConsole.Draggable = true
     miniConsole.Visible = false
     miniConsole.Parent = consoleGui
+    
+    -- КРИТИЧНО: Делаем Frame драгабельным через UIDragDetector
+    local dragDetector = Instance.new("UIDragDetector")
+    dragDetector.Parent = miniConsole
+    dragDetector.DragStyle = Enum.UIDragDetectorDragStyle.TranslatePlane
+    dragDetector.ResponseType = Enum.UIDragDetectorResponseType.Custom
+    
+    dragDetector.DragStart:Connect(function()
+        miniConsole.BorderColor3 = Color3.fromRGB(255, 255, 0)
+    end)
+    
+    dragDetector.DragEnd:Connect(function()
+        miniConsole.BorderColor3 = Color3.fromRGB(255, 165, 0)
+    end)
+    
+    dragDetector:GetPropertyChangedSignal("WorldPosition"):Connect(function()
+        local worldPos = dragDetector.WorldPosition
+        if worldPos then
+            miniConsole.Position = UDim2.new(0, worldPos.X, 0, worldPos.Y)
+        end
+    end)
     
     local miniLabel = Instance.new("TextLabel")
     miniLabel.Name = "Label"
@@ -3781,7 +3861,7 @@ function Console.Create()
     miniLabel.BackgroundTransparency = 1
     miniLabel.Text = "📋 Console"
     miniLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    miniLabel.TextSize = 14
+    miniLabel.TextSize = 12
     miniLabel.Font = Enum.Font.SourceSansBold
     miniLabel.Parent = miniConsole
     
@@ -3791,6 +3871,7 @@ function Console.Create()
     miniBtn.Size = UDim2.new(1, 0, 1, 0)
     miniBtn.BackgroundTransparency = 1
     miniBtn.Text = ""
+    miniBtn.ZIndex = 2
     miniBtn.Parent = miniConsole
     
     -- Логика сворачивания/разворачивания
@@ -3802,23 +3883,6 @@ function Console.Create()
     miniBtn.MouseButton1Click:Connect(function()
         miniConsole.Visible = false
         consoleFrame.Visible = true
-    end)
-    
-    -- НОВОЕ: Кнопка очистки
-    local clearBtn = Instance.new("TextButton")
-    clearBtn.Name = "ClearButton"
-    clearBtn.Size = UDim2.new(0, 60, 0, 30)
-    clearBtn.Position = UDim2.new(1, -100, 0, 0)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
-    clearBtn.BorderSizePixel = 0
-    clearBtn.Text = "Clear"
-    clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    clearBtn.TextSize = 12
-    clearBtn.Font = Enum.Font.SourceSansBold
-    clearBtn.Parent = titleBar
-    
-    clearBtn.MouseButton1Click:Connect(function()
-        Console.Clear()
     end)
     
     -- ScrollingFrame для скроллинга
@@ -4669,6 +4733,7 @@ DebugTab:AddButton({
         detectedCheatersCount = 0
         cheaterDetections = {}
         playerPositions = {}
+        detectedCheaters = {}  -- НОВОЕ: Очищаем список читеров
         
         Library:Notify({
             Title = "Тест: Сброс",
