@@ -640,6 +640,12 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local ScriptDestroyed = false
 
+-- ANTI-AFK
+LocalPlayer.Idled:Connect(function()
+    VirtualInputManager:CaptureController()
+    VirtualInputManager:ClickButton2(Vector2.new())
+end)
+
 -- Configuration
 local DefaultSettings = {
     Theme = "Darker",
