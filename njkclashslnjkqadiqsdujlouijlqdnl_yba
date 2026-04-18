@@ -1033,8 +1033,24 @@ local function ServerHop()
     _G.YBAAutoRestart = true
     _G.YBAAutoFarmEnabled = Settings.Autofarm
     _G.YBAAutoSellEnabled = Settings.Autosell
-    _G.YBAFarmItems = Settings.FarmItems
-    _G.YBASellItems = Settings.SellItems
+    
+    -- КРИТИЧНО: Сохраняем дропдауны ИЗ Options.Value (а не из Settings!)
+    if Options and Options.FarmItems and Options.FarmItems.Value then
+        _G.YBAFarmItems = Options.FarmItems.Value
+        print("[ServerHop] Сохранение FarmItems из Options.Value: " .. HttpService:JSONEncode(_G.YBAFarmItems))
+    else
+        _G.YBAFarmItems = Settings.FarmItems
+        print("[ServerHop] Сохранение FarmItems из Settings (фоллбэк): " .. HttpService:JSONEncode(_G.YBAFarmItems))
+    end
+    
+    if Options and Options.SellItems and Options.SellItems.Value then
+        _G.YBASellItems = Options.SellItems.Value
+        print("[ServerHop] Сохранение SellItems из Options.Value: " .. HttpService:JSONEncode(_G.YBASellItems))
+    else
+        _G.YBASellItems = Settings.SellItems
+        print("[ServerHop] Сохранение SellItems из Settings (фоллбэк): " .. HttpService:JSONEncode(_G.YBASellItems))
+    end
+    
     _G.YBAAutoServerHop = Settings.AutoServerHop
     
     -- НОВОЕ: Сохраняем статистику фарма
@@ -3582,7 +3598,7 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     Description = "Выбери какие предметы собирать",
     Values = farmItemsList,
     Multi = true,
-    Default = Settings.FarmItems,
+    Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
     Callback = function(Value)
         if isSettingDropdownProgrammatically then
             print("[YBA Enhanced] FarmItems Callback пропущен (программная установка)")
@@ -3590,28 +3606,23 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
         end
         Settings.FarmItems = Value
         saveSettings()
-        SaveConfigToServer()  -- Сохраняем на сервер ТОЛЬКО при ручном изменении
+        SaveConfigToServer()
         _G.YBAFarmItems = Value
         print("[YBA Enhanced] FarmItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
 
--- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
+-- КРИТИЧНО: Устанавливаем значение НАПРЯМУЮ без вызова Callback
 if Settings.FarmItems and next(Settings.FarmItems) ~= nil then
-    print("[YBA Enhanced] Принудительная установка FarmItems через SetValue()...")
-    print("[YBA Enhanced] Settings.FarmItems ДО SetValue: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
-    isSettingDropdownProgrammatically = true
-    Options.FarmItems:SetValue(Settings.FarmItems)
-    task.wait(0.1)
-    -- Проверяем что .Value установился
-    if not Options.FarmItems.Value or not next(Options.FarmItems.Value) then
-        print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
-        Options.FarmItems.Value = Settings.FarmItems
-    end
-    isSettingDropdownProgrammatically = false
-    print("[YBA Enhanced] Options.FarmItems.Value ПОСЛЕ SetValue: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value or {}))
+    print("[YBA Enhanced] Установка FarmItems напрямую в .Value...")
+    print("[YBA Enhanced] Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
+    
+    -- ПРЯМОЕ присваивание без SetValue
+    Options.FarmItems.Value = Settings.FarmItems
+    
+    print("[YBA Enhanced] Options.FarmItems.Value установлен: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
 else
-    print("[YBA Enhanced] Settings.FarmItems пустой, пропускаем SetValue")
+    print("[YBA Enhanced] Settings.FarmItems пустой, пропускаем установку")
 end
 
 print("[YBA Enhanced] === ДРОПДАУН FarmItems СОЗДАН ===")
@@ -3647,7 +3658,7 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     Description = "Выбери какие предметы продавать",
     Values = sellItemsList,
     Multi = true,
-    Default = Settings.SellItems,
+    Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
     Callback = function(Value)
         if isSettingDropdownProgrammatically then
             print("[YBA Enhanced] SellItems Callback пропущен (программная установка)")
@@ -3655,28 +3666,23 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
         end
         Settings.SellItems = Value
         saveSettings()
-        SaveConfigToServer()  -- Сохраняем на сервер
+        SaveConfigToServer()
         _G.YBASellItems = Value
         print("[YBA Enhanced] SellItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
 
--- КРИТИЧНО: Принудительно вызываем SetValue() чтобы установить .Value
+-- КРИТИЧНО: Устанавливаем значение НАПРЯМУЮ без вызова Callback
 if Settings.SellItems and next(Settings.SellItems) ~= nil then
-    print("[YBA Enhanced] Принудительная установка SellItems через SetValue()...")
-    print("[YBA Enhanced] Settings.SellItems ДО SetValue: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
-    isSettingDropdownProgrammatically = true
-    Options.SellItems:SetValue(Settings.SellItems)
-    task.wait(0.1)
-    -- Проверяем что .Value установился
-    if not Options.SellItems.Value or not next(Options.SellItems.Value) then
-        print("[YBA Enhanced] ОШИБКА: SetValue() не установил .Value! Устанавливаем напрямую...")
-        Options.SellItems.Value = Settings.SellItems
-    end
-    isSettingDropdownProgrammatically = false
-    print("[YBA Enhanced] Options.SellItems.Value ПОСЛЕ SetValue: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value or {}))
+    print("[YBA Enhanced] Установка SellItems напрямую в .Value...")
+    print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
+    
+    -- ПРЯМОЕ присваивание без SetValue
+    Options.SellItems.Value = Settings.SellItems
+    
+    print("[YBA Enhanced] Options.SellItems.Value установлен: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
 else
-    print("[YBA Enhanced] Settings.SellItems пустой, пропускаем SetValue")
+    print("[YBA Enhanced] Settings.SellItems пустой, пропускаем установку")
 end
 
 print("[YBA Enhanced] === ДРОПДАУН SellItems СОЗДАН ===")
@@ -3693,6 +3699,35 @@ print("[YBA Enhanced] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONE
 print("[YBA Enhanced] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems or {}))
 print("[YBA Enhanced] Options.FarmItems существует: " .. tostring(Options.FarmItems ~= nil))
 print("[YBA Enhanced] Options.SellItems существует: " .. tostring(Options.SellItems ~= nil))
+
+-- КРИТИЧНО: Восстанавливаем ТУМБЛЕРЫ тоже
+if _G.YBAAutoRestart then
+    print("[YBA Enhanced] Обнаружен флаг автозапуска - восстанавливаем тумблеры...")
+    
+    if _G.YBAAutoFarmEnabled ~= nil then
+        print("[YBA Enhanced] Восстановление Autofarm тумблера: " .. tostring(_G.YBAAutoFarmEnabled))
+        Settings.Autofarm = _G.YBAAutoFarmEnabled
+        if Options.Autofarm then
+            Options.Autofarm:SetValue(_G.YBAAutoFarmEnabled)
+        end
+    end
+    
+    if _G.YBAAutoSellEnabled ~= nil then
+        print("[YBA Enhanced] Восстановление Autosell тумблера: " .. tostring(_G.YBAAutoSellEnabled))
+        Settings.Autosell = _G.YBAAutoSellEnabled
+        if Options.Autosell then
+            Options.Autosell:SetValue(_G.YBAAutoSellEnabled)
+        end
+    end
+    
+    if _G.YBAAutoServerHop ~= nil then
+        print("[YBA Enhanced] Восстановление AutoServerHop тумблера: " .. tostring(_G.YBAAutoServerHop))
+        Settings.AutoServerHop = _G.YBAAutoServerHop
+        if Options.AutoServerHop then
+            Options.AutoServerHop:SetValue(_G.YBAAutoServerHop)
+        end
+    end
+end
 
 if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
     print("[YBA Enhanced] Восстановление FarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
