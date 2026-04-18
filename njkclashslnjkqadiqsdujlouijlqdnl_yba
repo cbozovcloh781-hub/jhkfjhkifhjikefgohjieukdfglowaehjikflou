@@ -1895,21 +1895,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 3%)
+    -- НЕМНОГО ЗАМЕДЛЕННАЯ СКОРОСТЬ (замедлено на 5%)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 34.51
-        stepDelay = 0.02778
+        stepSize = 32.78
+        stepDelay = 0.02917
     elseif distance < 300 then
-        stepSize = 38.57
-        stepDelay = 0.02583
+        stepSize = 36.64
+        stepDelay = 0.02712
     elseif distance < 600 then
-        stepSize = 40.63
-        stepDelay = 0.02381
+        stepSize = 38.60
+        stepDelay = 0.02500
     else
-        stepSize = 42.69
-        stepDelay = 0.02183
+        stepSize = 40.56
+        stepDelay = 0.02292
     end
     
     local direction = (targetPos - startPos).Unit
@@ -3576,7 +3576,7 @@ Options.Autofarm = AutoTab:AddToggle("Autofarm", {
     Default = Settings.Autofarm,
     Callback = function(Value)
         Settings.Autofarm = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         SaveConfigToServer()  -- Сохраняем на сервер
         
         -- КРИТИЧНО: Обновляем _G переменную
@@ -3639,7 +3639,7 @@ Options.Autosell = AutoTab:AddToggle("Autosell", {
     Default = Settings.Autosell,
     Callback = function(Value)
         Settings.Autosell = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         SaveConfigToServer()  -- Сохраняем на сервер
         
         -- КРИТИЧНО: Обновляем _G переменную
@@ -3826,13 +3826,13 @@ AutoTab:AddButton({
 })
 
 -- === ПОКУПКА LUCKY ARROW ===
-AutoTab:AddToggle("AutobuyLuckyArrow", {
+Options.AutobuyLuckyArrow = AutoTab:AddToggle("AutobuyLuckyArrow", {
     Title = "🎯 Auto Buy Lucky Arrow (Loop)",
     Description = "Автоматически покупает Lucky Arrow за $50,000 (бесконечно)",
     Default = Settings.AutobuyLuckyArrow,
     Callback = function(Value)
         Settings.AutobuyLuckyArrow = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         
         if Value then
             StartAutobuy()
@@ -3874,13 +3874,13 @@ AutoTab:AddButton({
 })
 
 -- === ЗАЩИТА ОТ ЧИТЕРОВ ===
-AutoTab:AddToggle("AutoServerHop", {
+Options.AutoServerHop = AutoTab:AddToggle("AutoServerHop", {
     Title = "🛡️ Auto Server Hop",
     Description = "Автоматически меняет сервер при обнаружении 3 читеров",
     Default = Settings.AutoServerHop,
     Callback = function(Value)
         Settings.AutoServerHop = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         
         if Value then
             StartCheaterDetection()
@@ -3918,13 +3918,13 @@ local TeleportTab = Window:AddTab({
 })
 
 -- === МОНИТОРИНГ БАЛАНСА ===
-AutoTab:AddToggle("MoneyFarmEnabled", {
+Options.MoneyFarmEnabled = AutoTab:AddToggle("MoneyFarmEnabled", {
     Title = "Мониторинг баланса",
     Description = "Отслеживает количество денег на аккаунте",
     Default = Settings.MoneyFarmEnabled,
     Callback = function(Value)
         Settings.MoneyFarmEnabled = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         
         if Value then
             StartMoneyFarm()
@@ -3934,13 +3934,13 @@ AutoTab:AddToggle("MoneyFarmEnabled", {
     end
 })
 
-AutoTab:AddToggle("AutoDropMoney", {
+Options.AutoDropMoney = AutoTab:AddToggle("AutoDropMoney", {
     Title = "Режим продажи",
     Description = "Включить когда нужно передать деньги покупателю",
     Default = Settings.AutoDropMoney,
     Callback = function(Value)
         Settings.AutoDropMoney = Value
-        saveSettings()
+        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
         
         if Value then
             Library:Notify({
