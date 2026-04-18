@@ -1895,21 +1895,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 9%)
+    -- ОЧЕНЬ БЫСТРАЯ СКОРОСТЬ (ускорено на 3%)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 36.54
-        stepDelay = 0.02622
+        stepSize = 34.51
+        stepDelay = 0.02778
     elseif distance < 300 then
-        stepSize = 40.86
-        stepDelay = 0.02436
+        stepSize = 38.57
+        stepDelay = 0.02583
     elseif distance < 600 then
-        stepSize = 43.02
-        stepDelay = 0.02247
+        stepSize = 40.63
+        stepDelay = 0.02381
     else
-        stepSize = 45.18
-        stepDelay = 0.02059
+        stepSize = 42.69
+        stepDelay = 0.02183
     end
     
     local direction = (targetPos - startPos).Unit
