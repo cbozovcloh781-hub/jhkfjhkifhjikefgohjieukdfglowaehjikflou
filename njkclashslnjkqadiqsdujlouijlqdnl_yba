@@ -656,7 +656,7 @@ local Options = {}
 
 -- Global variables
 
--- Global variables
+-- Global variables 
 local isFlying = false
 local flyConnections = {}
 local isNoClipping = false
