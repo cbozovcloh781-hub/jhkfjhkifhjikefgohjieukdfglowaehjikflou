@@ -2005,21 +2005,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- БЕЗОПАСНАЯ СКОРОСТЬ (уменьшенные шаги для защиты от fall damage)
+    -- ОЧЕНЬ БЕЗОПАСНАЯ СКОРОСТЬ (медленнее для избежания откатов)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 25
-        stepDelay = 0.035
+        stepSize = 20
+        stepDelay = 0.045
     elseif distance < 300 then
-        stepSize = 28
-        stepDelay = 0.032
+        stepSize = 22
+        stepDelay = 0.042
     elseif distance < 600 then
-        stepSize = 30
-        stepDelay = 0.030
+        stepSize = 24
+        stepDelay = 0.040
     else
-        stepSize = 32
-        stepDelay = 0.028
+        stepSize = 26
+        stepDelay = 0.038
     end
     
     local direction = (targetPos - startPos).Unit
