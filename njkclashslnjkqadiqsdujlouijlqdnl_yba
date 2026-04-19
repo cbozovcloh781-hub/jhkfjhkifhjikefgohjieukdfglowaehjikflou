@@ -2894,7 +2894,7 @@ local function ExecuteCommand(command, args)
             inventory_sellable_value = sellableValue,
             lucky_arrows = luckyArrows,
             lucky_masks = luckyMasks,
-            current_account = game.Players.LocalPlayer.Name
+            current_account = game.Players.LocalPlayer.Name,server_hops = farmStats.serverHops or 0
         }
         
         -- Отправляем статистику на сервер
@@ -5384,8 +5384,8 @@ DebugTab:AddButton({
                 inventory_sellable_value = sellableValue,
                 lucky_arrows = luckyArrows,
                 lucky_masks = luckyMasks,
-                current_account = game.Players.LocalPlayer.Name
-            }
+                current_account = game.Players.LocalPlayer.Name,server_hops = farmStats.serverHops or 0
+        }
             
             local HttpService = game:GetService("HttpService")
             local response = request({
