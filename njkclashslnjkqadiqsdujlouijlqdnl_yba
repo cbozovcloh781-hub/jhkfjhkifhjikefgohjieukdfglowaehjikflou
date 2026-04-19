@@ -795,29 +795,74 @@ local lastESPUpdate = {}
 local DrawingSupported = Drawing ~= nil and pcall(function() Drawing.new("Line") end)
 
 -- Load/Save functions
--- КРИТИЧНО: Функция сохранения конфига на сервер
+-- КРИТИЧНО: Функция сохранения ПОЛНОГО конфига на сервер
 local function SaveConfigToServer()
     pcall(function()
         local HttpService = game:GetService("HttpService")
+        
+        -- Конвертируем дропдауны в массивы
+        local farm_items = {}
+        for item, enabled in pairs(Settings.FarmItems or {}) do
+            if enabled then table.insert(farm_items, item) end
+        end
+        
+        local sell_items = {}
+        for item, enabled in pairs(Settings.SellItems or {}) do
+            if enabled then table.insert(sell_items, item) end
+        end
+        
+        -- Конвертируем Color3 в RGB таблицы
+        local function colorToRGB(color)
+            return {R = math.floor(color.R * 255), G = math.floor(color.G * 255), B = math.floor(color.B * 255)}
+        end
+        
         local config = {
+            -- Тумблеры
             autofarm = Settings.Autofarm,
             autosell = Settings.Autosell,
-            farm_items = {},
-            sell_items = {}
+            auto_server_hop = Settings.AutoServerHop,
+            fly = Settings.Fly,
+            noclip = Settings.NoClip,
+            speed = Settings.Speed,
+            infinite_jump = Settings.InfiniteJump,
+            jump_hack = Settings.JumpHack,
+            esp_enabled = ESPSettings.Enabled,
+            box_esp = ESPSettings.BoxESP,
+            tracer_esp = ESPSettings.TracerESP,
+            health_esp = ESPSettings.HealthESP,
+            name_esp = ESPSettings.NameESP,
+            chams_enabled = ESPSettings.ChamsEnabled,
+            skeleton_esp = ESPSettings.SkeletonESP,
+            team_check = ESPSettings.TeamCheck,
+            unlock_zoom = Settings.UnlockZoom,
+            custom_console = Settings.CustomConsole,
+            money_farm_enabled = Settings.MoneyFarmEnabled,
+            auto_drop_money = Settings.AutoDropMoney,
+            autobuy_lucky_arrow = Settings.AutobuyLuckyArrow,
+            
+            -- Дропдауны
+            farm_items = farm_items,
+            sell_items = sell_items,
+            box_style = ESPSettings.BoxStyle,
+            
+            -- Слайдеры
+            fly_speed = Settings.FlySpeed,
+            speed_value = Settings.SpeedValue,
+            jump_height = Settings.JumpHeight,
+            cheater_detection_sensitivity = Settings.CheaterDetectionSensitivity,
+            max_distance = ESPSettings.MaxDistance,
+            
+            -- Колорпикеры
+            box_color = colorToRGB(Colors.Box),
+            tracer_color = colorToRGB(Colors.Tracer),
+            name_color = colorToRGB(Colors.Name),
+            chams_fill_color = colorToRGB(ESPSettings.ChamsFillColor),
+            chams_outline_color = colorToRGB(ESPSettings.ChamsOutlineColor),
+            skeleton_color = colorToRGB(ESPSettings.SkeletonColor),
+            
+            -- Инпуты
+            receiver_username = Settings.ReceiverUsername
         }
-        
-        -- Конвертируем таблицы в массивы
-        for item, enabled in pairs(Settings.FarmItems or {}) do
-            if enabled then
-                table.insert(config.farm_items, item)
-            end
-        end
-        
-        for item, enabled in pairs(Settings.SellItems or {}) do
-            if enabled then
-                table.insert(config.sell_items, item)
-            end
-        end
         
         request({
             Url = "http://localhost:5000/api/config",
@@ -826,12 +871,99 @@ local function SaveConfigToServer()
             Body = HttpService:JSONEncode(config)
         })
         
-        print("[YBA Enhanced] Конфиг сохранен на сервер")
-        print("[YBA Enhanced]   Autofarm: " .. tostring(config.autofarm))
-        print("[YBA Enhanced]   Autosell: " .. tostring(config.autosell))
-        print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(config.farm_items))
-        print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(config.sell_items))
+        print("[YBA Enhanced] Полный конфиг сохранен на сервер")
     end)
+end
+
+-- КРИТИЧНО: Функция загрузки ПОЛНОГО конфига с сервера
+local function LoadConfigFromServer()
+    local success, result = pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local response = request({
+            Url = "http://localhost:5000/api/config",
+            Method = "GET"
+        })
+        
+        if response and response.StatusCode == 200 then
+            local serverConfig = HttpService:JSONDecode(response.Body)
+            print("[YBA Enhanced] Конфиг загружен с сервера")
+            
+            -- Конвертируем RGB таблицы в Color3
+            local function rgbToColor(rgb)
+                return Color3.fromRGB(rgb.R or 255, rgb.G or 255, rgb.B or 255)
+            end
+            
+            -- Применяем тумблеры
+            if serverConfig.autofarm ~= nil then Settings.Autofarm = serverConfig.autofarm end
+            if serverConfig.autosell ~= nil then Settings.Autosell = serverConfig.autosell end
+            if serverConfig.auto_server_hop ~= nil then Settings.AutoServerHop = serverConfig.auto_server_hop end
+            if serverConfig.fly ~= nil then Settings.Fly = serverConfig.fly end
+            if serverConfig.noclip ~= nil then Settings.NoClip = serverConfig.noclip end
+            if serverConfig.speed ~= nil then Settings.Speed = serverConfig.speed end
+            if serverConfig.infinite_jump ~= nil then Settings.InfiniteJump = serverConfig.infinite_jump end
+            if serverConfig.jump_hack ~= nil then Settings.JumpHack = serverConfig.jump_hack end
+            if serverConfig.esp_enabled ~= nil then ESPSettings.Enabled = serverConfig.esp_enabled end
+            if serverConfig.box_esp ~= nil then ESPSettings.BoxESP = serverConfig.box_esp end
+            if serverConfig.tracer_esp ~= nil then ESPSettings.TracerESP = serverConfig.tracer_esp end
+            if serverConfig.health_esp ~= nil then ESPSettings.HealthESP = serverConfig.health_esp end
+            if serverConfig.name_esp ~= nil then ESPSettings.NameESP = serverConfig.name_esp end
+            if serverConfig.chams_enabled ~= nil then ESPSettings.ChamsEnabled = serverConfig.chams_enabled end
+            if serverConfig.skeleton_esp ~= nil then ESPSettings.SkeletonESP = serverConfig.skeleton_esp end
+            if serverConfig.team_check ~= nil then ESPSettings.TeamCheck = serverConfig.team_check end
+            if serverConfig.unlock_zoom ~= nil then Settings.UnlockZoom = serverConfig.unlock_zoom end
+            if serverConfig.custom_console ~= nil then Settings.CustomConsole = serverConfig.custom_console end
+            if serverConfig.money_farm_enabled ~= nil then Settings.MoneyFarmEnabled = serverConfig.money_farm_enabled end
+            if serverConfig.auto_drop_money ~= nil then Settings.AutoDropMoney = serverConfig.auto_drop_money end
+            if serverConfig.autobuy_lucky_arrow ~= nil then Settings.AutobuyLuckyArrow = serverConfig.autobuy_lucky_arrow end
+            
+            -- Применяем дропдауны
+            if serverConfig.farm_items then
+                Settings.FarmItems = {}
+                for _, item in ipairs(serverConfig.farm_items) do
+                    Settings.FarmItems[item] = true
+                end
+            end
+            if serverConfig.sell_items then
+                Settings.SellItems = {}
+                for _, item in ipairs(serverConfig.sell_items) do
+                    Settings.SellItems[item] = true
+                end
+            end
+            if serverConfig.box_style then ESPSettings.BoxStyle = serverConfig.box_style end
+            
+            -- Применяем слайдеры
+            if serverConfig.fly_speed then Settings.FlySpeed = serverConfig.fly_speed end
+            if serverConfig.speed_value then Settings.SpeedValue = serverConfig.speed_value end
+            if serverConfig.jump_height then Settings.JumpHeight = serverConfig.jump_height end
+            if serverConfig.cheater_detection_sensitivity then Settings.CheaterDetectionSensitivity = serverConfig.cheater_detection_sensitivity end
+            if serverConfig.max_distance then ESPSettings.MaxDistance = serverConfig.max_distance end
+            
+            -- Применяем колорпикеры
+            if serverConfig.box_color then Colors.Box = rgbToColor(serverConfig.box_color) end
+            if serverConfig.tracer_color then Colors.Tracer = rgbToColor(serverConfig.tracer_color) end
+            if serverConfig.name_color then Colors.Name = rgbToColor(serverConfig.name_color) end
+            if serverConfig.chams_fill_color then ESPSettings.ChamsFillColor = rgbToColor(serverConfig.chams_fill_color) end
+            if serverConfig.chams_outline_color then ESPSettings.ChamsOutlineColor = rgbToColor(serverConfig.chams_outline_color) end
+            if serverConfig.skeleton_color then ESPSettings.SkeletonColor = rgbToColor(serverConfig.skeleton_color) end
+            
+            -- Применяем инпуты
+            if serverConfig.receiver_username then Settings.ReceiverUsername = serverConfig.receiver_username end
+            
+            -- Обновляем _G переменные
+            _G.YBAAutoFarmEnabled = Settings.Autofarm
+            _G.YBAAutoSellEnabled = Settings.Autosell
+            _G.YBAAutoServerHop = Settings.AutoServerHop
+            _G.YBAFarmItems = Settings.FarmItems
+            _G.YBASellItems = Settings.SellItems
+            _G.YBAESPEnabled = ESPSettings.Enabled
+            
+            print("[YBA Enhanced] Настройки применены из серверного конфига")
+            return true
+        end
+        return false
+    end)
+    
+    return success and result
 end
 
 local function loadSettings()
@@ -894,47 +1026,8 @@ end
 -- КРИТИЧНО: Инициализируем Settings перед загрузкой
 Settings = table.clone(DefaultSettings)
 
--- КРИТИЧНО: СНАЧАЛА пытаемся загрузить конфиг с сервера
-local serverConfigLoaded = false
-pcall(function()
-    local HttpService = game:GetService("HttpService")
-    local response = request({
-        Url = "http://localhost:5000/api/config",
-        Method = "GET"
-    })
-    
-    if response and response.StatusCode == 200 then
-        local serverConfig = HttpService:JSONDecode(response.Body)
-        print("[YBA Enhanced] Конфиг загружен с сервера: " .. HttpService:JSONEncode(serverConfig))
-        
-        -- Применяем конфиг к Settings
-        Settings.Autofarm = serverConfig.autofarm
-        Settings.Autosell = serverConfig.autosell
-        Settings.FarmItems = {}
-        Settings.SellItems = {}
-        
-        for _, item in ipairs(serverConfig.farm_items or {}) do
-            Settings.FarmItems[item] = true
-        end
-        for _, item in ipairs(serverConfig.sell_items or {}) do
-            Settings.SellItems[item] = true
-        end
-        
-        -- Обновляем _G тоже
-        _G.YBAAutoFarmEnabled = serverConfig.autofarm
-        _G.YBAAutoSellEnabled = serverConfig.autosell
-        _G.YBAFarmItems = Settings.FarmItems
-        _G.YBASellItems = Settings.SellItems
-        
-        serverConfigLoaded = true
-        
-        print("[YBA Enhanced] Settings обновлены из серверного конфига:")
-        print("[YBA Enhanced]   Autofarm: " .. tostring(Settings.Autofarm))
-        print("[YBA Enhanced]   Autosell: " .. tostring(Settings.Autosell))
-        print("[YBA Enhanced]   FarmItems: " .. HttpService:JSONEncode(Settings.FarmItems))
-        print("[YBA Enhanced]   SellItems: " .. HttpService:JSONEncode(Settings.SellItems))
-    end
-end)
+-- КРИТИЧНО: СНАЧАЛА пытаемся загрузить ПОЛНЫЙ конфиг с сервера
+local serverConfigLoaded = LoadConfigFromServer()
 
 -- КРИТИЧНО: Загружаем локальный файл ТОЛЬКО если серверный конфиг НЕ загрузился
 if not serverConfigLoaded then
@@ -3420,6 +3513,7 @@ MovementTab:AddToggle("Fly", {
     Callback = function(Value)
         Settings.Fly = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartFly()
@@ -3439,6 +3533,7 @@ MovementTab:AddSlider("FlySpeed", {
     Callback = function(Value)
         Settings.FlySpeed = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
     end
 })
 
@@ -3449,6 +3544,7 @@ MovementTab:AddToggle("NoClip", {
     Callback = function(Value)
         Settings.NoClip = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartNoClip()
@@ -3465,6 +3561,7 @@ MovementTab:AddToggle("Speed", {
     Callback = function(Value)
         Settings.Speed = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartSpeed()
@@ -3484,6 +3581,7 @@ MovementTab:AddSlider("SpeedValue", {
     Callback = function(Value)
         Settings.SpeedValue = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if isSpeedHacking then
             local character = Player.Character
@@ -3504,6 +3602,7 @@ MovementTab:AddToggle("InfiniteJump", {
     Callback = function(Value)
         Settings.InfiniteJump = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartInfiniteJump()
@@ -3520,6 +3619,7 @@ MovementTab:AddToggle("JumpHack", {
     Callback = function(Value)
         Settings.JumpHack = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartJumpHack()
@@ -3539,6 +3639,7 @@ MovementTab:AddSlider("JumpHeight", {
     Callback = function(Value)
         Settings.JumpHeight = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if isJumpHacking then
             local character = Player.Character
@@ -3554,23 +3655,23 @@ MovementTab:AddSlider("JumpHeight", {
 
 -- ESP Tab
 local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
-ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false _G.YBAESPEnabled = false return end ESPSettings.Enabled = Value _G.YBAESPEnabled = Value saveSettings() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
-ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() end})
-ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() end})
-ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() end})
-ESPTab:AddToggle("HealthESP", {Title = "Health Bar", Default = ESPSettings.HealthESP, Callback = function(Value) ESPSettings.HealthESP = Value saveSettings() end})
-ESPTab:AddToggle("NameESP", {Title = "Name ESP", Default = ESPSettings.NameESP, Callback = function(Value) ESPSettings.NameESP = Value saveSettings() end})
-ESPTab:AddToggle("ChamsEnabled", {Title = "Chams", Default = ESPSettings.ChamsEnabled, Callback = function(Value) ESPSettings.ChamsEnabled = Value saveSettings() end})
-ESPTab:AddToggle("SkeletonESP", {Title = "Skeleton ESP", Default = ESPSettings.SkeletonESP, Callback = function(Value) ESPSettings.SkeletonESP = Value saveSettings() end})
-ESPTab:AddToggle("TeamCheck", {Title = "Team Check", Default = ESPSettings.TeamCheck, Callback = function(Value) ESPSettings.TeamCheck = Value saveSettings() end})
-ESPTab:AddSlider("MaxDistance", {Title = "Max Distance", Default = ESPSettings.MaxDistance, Min = 100, Max = 5000, Rounding = 0, Callback = function(Value) ESPSettings.MaxDistance = Value saveSettings() end})
+ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false _G.YBAESPEnabled = false return end ESPSettings.Enabled = Value _G.YBAESPEnabled = Value saveSettings() SaveConfigToServer() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
+ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("HealthESP", {Title = "Health Bar", Default = ESPSettings.HealthESP, Callback = function(Value) ESPSettings.HealthESP = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("NameESP", {Title = "Name ESP", Default = ESPSettings.NameESP, Callback = function(Value) ESPSettings.NameESP = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("ChamsEnabled", {Title = "Chams", Default = ESPSettings.ChamsEnabled, Callback = function(Value) ESPSettings.ChamsEnabled = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("SkeletonESP", {Title = "Skeleton ESP", Default = ESPSettings.SkeletonESP, Callback = function(Value) ESPSettings.SkeletonESP = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddToggle("TeamCheck", {Title = "Team Check", Default = ESPSettings.TeamCheck, Callback = function(Value) ESPSettings.TeamCheck = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddSlider("MaxDistance", {Title = "Max Distance", Default = ESPSettings.MaxDistance, Min = 100, Max = 5000, Rounding = 0, Callback = function(Value) ESPSettings.MaxDistance = Value saveSettings() SaveConfigToServer() end})
 
-ESPTab:AddColorpicker("BoxColor", {Title = "Box Color", Default = Colors.Box, Callback = function(Value) Colors.Box = Value saveSettings() end})
-ESPTab:AddColorpicker("TracerColor", {Title = "Tracer Color", Default = Colors.Tracer, Callback = function(Value) Colors.Tracer = Value saveSettings() end})
-ESPTab:AddColorpicker("NameColor", {Title = "Name Color", Default = Colors.Name, Callback = function(Value) Colors.Name = Value saveSettings() end})
-ESPTab:AddColorpicker("ChamsFillColor", {Title = "Chams Fill Color", Default = ESPSettings.ChamsFillColor, Callback = function(Value) ESPSettings.ChamsFillColor = Value saveSettings() end})
-ESPTab:AddColorpicker("ChamsOutlineColor", {Title = "Chams Outline Color", Default = ESPSettings.ChamsOutlineColor, Callback = function(Value) ESPSettings.ChamsOutlineColor = Value saveSettings() end})
-ESPTab:AddColorpicker("SkeletonColor", {Title = "Skeleton Color", Default = ESPSettings.SkeletonColor, Callback = function(Value) ESPSettings.SkeletonColor = Value saveSettings() end})
+ESPTab:AddColorpicker("BoxColor", {Title = "Box Color", Default = Colors.Box, Callback = function(Value) Colors.Box = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddColorpicker("TracerColor", {Title = "Tracer Color", Default = Colors.Tracer, Callback = function(Value) Colors.Tracer = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddColorpicker("NameColor", {Title = "Name Color", Default = Colors.Name, Callback = function(Value) Colors.Name = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddColorpicker("ChamsFillColor", {Title = "Chams Fill Color", Default = ESPSettings.ChamsFillColor, Callback = function(Value) ESPSettings.ChamsFillColor = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddColorpicker("ChamsOutlineColor", {Title = "Chams Outline Color", Default = ESPSettings.ChamsOutlineColor, Callback = function(Value) ESPSettings.ChamsOutlineColor = Value saveSettings() SaveConfigToServer() end})
+ESPTab:AddColorpicker("SkeletonColor", {Title = "Skeleton Color", Default = ESPSettings.SkeletonColor, Callback = function(Value) ESPSettings.SkeletonColor = Value saveSettings() SaveConfigToServer() end})
 
 -- Autofarm Tab
 local AutoTab = Window:AddTab({Title = "Autofarm", Icon = "cpu"})
@@ -3838,7 +3939,8 @@ Options.AutobuyLuckyArrow = AutoTab:AddToggle("AutobuyLuckyArrow", {
     Default = Settings.AutobuyLuckyArrow,
     Callback = function(Value)
         Settings.AutobuyLuckyArrow = Value
-        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
+        saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartAutobuy()
@@ -3906,6 +4008,7 @@ AutoTab:AddSlider("CheaterDetectionSensitivity", {
     Callback = function(Value)
         Settings.CheaterDetectionSensitivity = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
     end
 })
 
@@ -3930,7 +4033,8 @@ Options.MoneyFarmEnabled = AutoTab:AddToggle("MoneyFarmEnabled", {
     Default = Settings.MoneyFarmEnabled,
     Callback = function(Value)
         Settings.MoneyFarmEnabled = Value
-        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
+        saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartMoneyFarm()
@@ -3946,7 +4050,8 @@ Options.AutoDropMoney = AutoTab:AddToggle("AutoDropMoney", {
     Default = Settings.AutoDropMoney,
     Callback = function(Value)
         Settings.AutoDropMoney = Value
-        saveSettings()  -- КРИТИЧНО: Сохраняем в файл
+        saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             Library:Notify({
@@ -3966,6 +4071,7 @@ AutoTab:AddInput("ReceiverUsername", {
     Callback = function(Value)
         Settings.ReceiverUsername = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
     end
 })
 
@@ -4544,6 +4650,7 @@ SettingsTab:AddToggle("UnlockZoom", {
     Callback = function(Value)
         Settings.UnlockZoom = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             Player.CameraMaxZoomDistance = math.huge
@@ -4562,6 +4669,7 @@ SettingsTab:AddToggle("CustomConsole", {
     Callback = function(Value)
         Settings.CustomConsole = Value
         saveSettings()
+        SaveConfigToServer()  -- Сохраняем на сервер
         
         if Value then
             StartConsole()
