@@ -1,6 +1,19 @@
+---@diagnostic disable: undefined-global
+-- Suppress Lua diagnostics for Roblox globals
+-- These globals are provided by Roblox at runtime
+
+-- Helper function to copy tables (replacement for table.clone)
+local function table_copy(t)
+    local copy = {}
+    for k, v in pairs(t) do
+        copy[k] = v
+    end
+    return copy
+end
+
 -- Проверка на повторный запуск и очистка предыдущего экземпляра
 if _G.YBAEnhancedLoaded then
-    -- УБРАНО: print("[YBA Enhanced] Обнаружен предыдущий экземпляр скрипта. Выполняется очистка...")
+    -- УБРАНО: 
     
     -- КРИТИЧНО: Удаляем старую консоль ДО вызова Cleanup
     pcall(function()
@@ -29,7 +42,7 @@ task.spawn(function()
     local playerGui = player:WaitForChild("PlayerGui", 10)
     
     if not playerGui then
-        print("[YBA Enhanced] PlayerGui не найден!")
+        
         return
     end
     
@@ -47,7 +60,7 @@ task.spawn(function()
                 local prestigeValue = playerStats:FindFirstChild("Prestige")
                 if prestigeValue then
                     prestige = prestigeValue.Value or 0
-                    -- УБРАНО: print("[YBA Enhanced] Престиж игрока: " .. prestige .. " (попытка " .. prestigeCheckAttempts .. ")")
+                    -- УБРАНО: ")
                     return true
                 end
             end
@@ -55,7 +68,7 @@ task.spawn(function()
         end)
         
         if success and prestige > 0 then
-            -- УБРАНО: print("[YBA Enhanced] Престиж подтвержден: " .. prestige)
+            -- УБРАНО: 
             break
         end
         
@@ -208,21 +221,17 @@ task.spawn(function()
     
     -- Проверяем флаг автозапуска
     if _G.YBAAutoRestart then
-        print("[YBA Enhanced] Обнаружен флаг автозапуска после server hop!")
-        print("[YBA Enhanced] _G.YBAAutoFarmEnabled = " .. tostring(_G.YBAAutoFarmEnabled))
-        print("[YBA Enhanced] _G.YBAAutoSellEnabled = " .. tostring(_G.YBAAutoSellEnabled))
-        
         -- Ждем загрузки UI
-        print("[YBA Enhanced] Ожидание загрузки UI...")
+        
         task.wait(3)  -- Увеличена задержка для полной загрузки UI
         
         -- Восстанавливаем настройки
         if _G.YBAFarmItems then
-            print("[YBA Enhanced] Восстановление FarmItems")
+            
             Settings.FarmItems = _G.YBAFarmItems
         end
         if _G.YBASellItems then
-            print("[YBA Enhanced] Восстановление SellItems")
+            
             Settings.SellItems = _G.YBASellItems
         end
         if _G.YBAAutoServerHop ~= nil then
@@ -233,21 +242,18 @@ task.spawn(function()
         task.wait(1)
         if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
             Settings.FarmItems = _G.YBAFarmItems
-            print("[YBA Enhanced] FarmItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         end
         if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
             Settings.SellItems = _G.YBASellItems
-            print("[YBA Enhanced] SellItems восстановлены: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         end
         
         -- Восстанавливаем в UI (БЕЗ вызова Callback)
-        print("[YBA Enhanced] Ожидание создания Options...")
+        
         local maxWait = 10
         local waited = 0
         while (not Options.FarmItems or not Options.SellItems) and waited < maxWait do
             task.wait(0.5)
             waited = waited + 0.5
-            print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
         end
         
         -- ИСПРАВЛЕНО: Сохраняем значения ПЕРЕД SetValue
@@ -255,7 +261,7 @@ task.spawn(function()
         local savedSellItems = _G.YBASellItems
         
         if Options.FarmItems and savedFarmItems then
-            print("[YBA Enhanced] Восстановление FarmItems в UI...")
+            
             
             -- КРИТИЧНО: SetValue НЕ вызывает Callback для дропдаунов!
             Options.FarmItems:SetValue(savedFarmItems)
@@ -263,23 +269,19 @@ task.spawn(function()
             -- ИСПРАВЛЕНО: Принудительно обновляем Options.FarmItems.Value
             task.wait(0.2)
             if Options.FarmItems.Value then
-                print("[YBA Enhanced] Options.FarmItems.Value ДО: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
+                -- Value updated
             end
             
             -- КРИТИЧНО: Принудительно устанавливаем .Value
             Options.FarmItems.Value = savedFarmItems
             Settings.FarmItems = savedFarmItems
             _G.YBAFarmItems = savedFarmItems
-            
-            print("[YBA Enhanced] FarmItems восстановлены:")
-            print("[YBA Enhanced]   Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
-            print("[YBA Enhanced]   Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
-            print("[YBA Enhanced] ОШИБКА: Options.FarmItems не найден!")
+            -- No saved items
         end
         
         if Options.SellItems and savedSellItems then
-            print("[YBA Enhanced] Восстановление SellItems в UI...")
+            
             
             -- КРИТИЧНО: SetValue НЕ вызывает Callback для дропдаунов!
             Options.SellItems:SetValue(savedSellItems)
@@ -287,41 +289,34 @@ task.spawn(function()
             -- ИСПРАВЛЕНО: Принудительно обновляем Options.SellItems.Value
             task.wait(0.2)
             if Options.SellItems.Value then
-                print("[YBA Enhanced] Options.SellItems.Value ДО: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
+                -- Value updated
             end
             
             -- КРИТИЧНО: Принудительно устанавливаем .Value
             Options.SellItems.Value = savedSellItems
             Settings.SellItems = savedSellItems
             _G.YBASellItems = savedSellItems
-            
-            print("[YBA Enhanced] SellItems восстановлены:")
-            print("[YBA Enhanced]   Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
-            print("[YBA Enhanced]   Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
-            print("[YBA Enhanced] ОШИБКА: Options.SellItems не найден!")
+            -- No saved items
         end
         
         -- АВТОЗАПУСК АВТОФАРМА
         if _G.YBAAutoFarmEnabled then
-            print("[YBA Enhanced] Автозапуск автофарма...")
+            
             task.wait(2)  -- Увеличена задержка для полной загрузки
             
             -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autofarm = true
-            print("[YBA Enhanced] Settings.Autofarm = true")
+            
             
             -- КРИТИЧНО: Проверяем что Settings.FarmItems НЕ пустой!
             if not Settings.FarmItems or not next(Settings.FarmItems) then
-                print("[YBA Enhanced] ПРЕДУПРЕЖДЕНИЕ: Settings.FarmItems пустой! Восстанавливаем из _G...")
+                
                 if _G.YBAFarmItems and next(_G.YBAFarmItems) then
                     Settings.FarmItems = _G.YBAFarmItems
-                    print("[YBA Enhanced] Settings.FarmItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
                 else
-                    print("[YBA Enhanced] ОШИБКА: _G.YBAFarmItems тоже пустой!")
+                    
                 end
-            else
-                print("[YBA Enhanced] Settings.FarmItems не пустой: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
             end
             
             -- Ждем создания Options
@@ -329,22 +324,17 @@ task.spawn(function()
             while not Options.Autofarm and waitTime < 5 do
                 task.wait(0.5)
                 waitTime = waitTime + 0.5
-                print("[YBA Enhanced] Ожидание Options.Autofarm... (" .. waitTime .. "с)")
             end
             
             -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autofarm then
                 Options.Autofarm:SetValue(true)
-                print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
+                
             else
-                print("[YBA Enhanced] ОШИБКА: Options.Autofarm не найден!")
+                
             end
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutofarm ВРУЧНУЮ!
-            print("[YBA Enhanced] Запуск StartAutofarm()...")
-            print("[YBA Enhanced] ФИНАЛЬНАЯ ПРОВЕРКА:")
-            print("[YBA Enhanced]   Settings.Autofarm = " .. tostring(Settings.Autofarm))
-            print("[YBA Enhanced]   Settings.FarmItems = " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems or {}))
             
             -- ИСПРАВЛЕНО: Проверяем что FarmItems НЕ пустой И содержит хотя бы один выбранный предмет
             local hasSelectedItems = false
@@ -352,72 +342,65 @@ task.spawn(function()
                 for item, isSelected in pairs(Settings.FarmItems) do
                     if isSelected then
                         hasSelectedItems = true
-                        print("[YBA Enhanced]   Выбран предмет: " .. item)
+                        
                         break
                     end
                 end
             end
             
             if not hasSelectedItems then
-                print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Settings.FarmItems пустой или нет выбранных предметов!")
-                print("[YBA Enhanced] Попытка восстановления из _G.YBAFarmItems...")
+                
+                
                 if _G.YBAFarmItems and next(_G.YBAFarmItems) then
                     Settings.FarmItems = _G.YBAFarmItems
-                    print("[YBA Enhanced] Settings.FarmItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
                     hasSelectedItems = true
                 else
-                    print("[YBA Enhanced] ОШИБКА: _G.YBAFarmItems тоже пустой!")
+                    
                 end
             end
             
             if StartAutofarm then
                 if hasSelectedItems then
                     StartAutofarm()
-                    print("[YBA Enhanced] StartAutofarm() выполнен успешно")
                 else
-                    print("[YBA Enhanced] ОШИБКА: Settings.FarmItems пустой! Автофарм НЕ запущен!")
+                    
                     -- УБРАНО: Уведомление об ошибке при автозапуске
                 end
             else
-                print("[YBA Enhanced] ОШИБКА: Функция StartAutofarm не найдена!")
+                
             end
             
             -- УБРАНО: Уведомление при автозапуске
         else
-            print("[YBA Enhanced] Автофарм НЕ будет запущен (_G.YBAAutoFarmEnabled = false)")
+            
         end
         
         -- АВТОЗАПУСК АВТОПРОДАЖИ
         if _G.YBAAutoSellEnabled then
-            print("[YBA Enhanced] Автозапуск автопродажи...")
+            
             task.wait(1)
             
             -- КРИТИЧНО: ПРИНУДИТЕЛЬНО загружаем конфиг с сервера ПЕРЕД запуском
-            print("[YBA Enhanced] Принудительная загрузка конфига перед автоселлом...")
+            
             local configLoaded = LoadConfigFromServer()
             if configLoaded then
-                print("[YBA Enhanced] Конфиг загружен успешно!")
-                print("[YBA Enhanced] Settings.Autosell: " .. tostring(Settings.Autosell))
-                print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
+                
             else
-                print("[YBA Enhanced] ОШИБКА: Конфиг не загрузился! Используем локальные настройки.")
+                
             end
             
             -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autosell = true
-            print("[YBA Enhanced] Settings.Autosell = true")
+            
             
             -- КРИТИЧНО: Проверяем что Settings.SellItems НЕ пустой!
             if not Settings.SellItems or not next(Settings.SellItems) then
-                print("[YBA Enhanced] ПРЕДУПРЕЖДЕНИЕ: Settings.SellItems пустой! Восстанавливаем из _G...")
+                
                 if _G.YBASellItems and next(_G.YBASellItems) then
                     Settings.SellItems = _G.YBASellItems
-                    print("[YBA Enhanced] Settings.SellItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
                 else
-                    print("[YBA Enhanced] ОШИБКА: _G.YBASellItems тоже пустой!")
+                    
                 end
-            else
-                print("[YBA Enhanced] Settings.SellItems не пустой: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
             end
             
             -- Ждем создания Options
@@ -425,22 +408,17 @@ task.spawn(function()
             while not Options.Autosell and waitTime < 5 do
                 task.wait(0.5)
                 waitTime = waitTime + 0.5
-                print("[YBA Enhanced] Ожидание Options.Autosell... (" .. waitTime .. "с)")
             end
             
             -- КРИТИЧНО: Обновляем тумблер в UI (БЕЗ вызова Callback)
             if Options.Autosell then
                 Options.Autosell:SetValue(true)
-                print("[YBA Enhanced] Тумблер Autosell установлен в ON")
+                
             else
-                print("[YBA Enhanced] ОШИБКА: Options.Autosell не найден!")
+                
             end
             
             -- КРИТИЧНО: ВЫЗЫВАЕМ StartAutosell ВРУЧНУЮ!
-            print("[YBA Enhanced] Запуск StartAutosell()...")
-            print("[YBA Enhanced] ФИНАЛЬНАЯ ПРОВЕРКА:")
-            print("[YBA Enhanced]   Settings.Autosell = " .. tostring(Settings.Autosell))
-            print("[YBA Enhanced]   Settings.SellItems = " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
             
             -- ИСПРАВЛЕНО: Проверяем что SellItems НЕ пустой И содержит хотя бы один выбранный предмет
             local hasSelectedItems = false
@@ -448,49 +426,47 @@ task.spawn(function()
                 for item, isSelected in pairs(Settings.SellItems) do
                     if isSelected then
                         hasSelectedItems = true
-                        print("[YBA Enhanced]   Выбран предмет: " .. item)
+                        
                         break
                     end
                 end
             end
             
             if not hasSelectedItems then
-                print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Settings.SellItems пустой или нет выбранных предметов!")
-                print("[YBA Enhanced] Попытка восстановления из _G.YBASellItems...")
+                
+                
                 if _G.YBASellItems and next(_G.YBASellItems) then
                     Settings.SellItems = _G.YBASellItems
-                    print("[YBA Enhanced] Settings.SellItems восстановлен: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
                     hasSelectedItems = true
                 else
-                    print("[YBA Enhanced] ОШИБКА: _G.YBASellItems тоже пустой!")
+                    
                 end
             end
             
             if StartAutosell then
                 if hasSelectedItems then
                     StartAutosell()
-                    print("[YBA Enhanced] StartAutosell() выполнен успешно")
                 else
-                    print("[YBA Enhanced] ОШИБКА: Settings.SellItems пустой! Автопродажа НЕ запущена!")
+                    
                     -- УБРАНО: Уведомление об ошибке при автозапуске
                 end
             else
-                print("[YBA Enhanced] ОШИБКА: Функция StartAutosell не найдена!")
+                
             end
         else
-            print("[YBA Enhanced] Автопродажа НЕ будет запущена (_G.YBAAutoSellEnabled = false)")
+            
         end
         
         -- АВТОЗАПУСК ДЕТЕКТОРА ЧИТЕРОВ
         if Settings.AutoServerHop then
-            print("[YBA Enhanced] Автозапуск детектора читеров...")
+            
             StartCheaterDetection()
         end
         
-        print("[YBA Enhanced] Автозапуск завершен успешно!")
+        
     else
         -- ОБЫЧНЫЙ ЗАПУСК (не после server hop)
-        print("[YBA Enhanced] Обычный запуск - проверка настроек...")
+        
         
         -- Ждем загрузки UI
         task.wait(3)  -- УВЕЛИЧЕНА задержка с 2 до 3 секунд
@@ -500,27 +476,25 @@ task.spawn(function()
         local waited = 0
         while waited < maxWait do
             if Options and Options.Autofarm and Options.Autosell then
-                print("[YBA Enhanced] Options созданы успешно!")
+                
                 break
             end
             task.wait(0.5)
             waited = waited + 0.5
-            print("[YBA Enhanced] Ожидание Options... (" .. waited .. "с)")
         end
         
         if not Options or not Options.Autofarm or not Options.Autosell then
-            print("[YBA Enhanced] ОШИБКА: Options не созданы за " .. maxWait .. " секунд!")
+            
         end
         
         -- КРИТИЧНО: Проверяем сохраненные настройки из файла
         if Settings.Autofarm then
-            print("[YBA Enhanced] Автозапуск автофарма (из файла настроек)...")
             task.wait(1)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
             if Options.Autofarm then
                 Options.Autofarm:SetValue(true)
-                print("[YBA Enhanced] Тумблер Autofarm установлен в ON")
+                
             end
             
             -- КРИТИЧНО: Проверяем что FarmItems не пустой
@@ -529,20 +503,19 @@ task.spawn(function()
                 
                 -- УБРАНО: Уведомление при автозапуске
             else
-                print("[YBA Enhanced] ОШИБКА: FarmItems пустой! Автофарм НЕ запущен!")
+                
                 -- УБРАНО: Уведомление об ошибке
             end
         end
         
         -- Если автопродажа была включена - запускаем
         if Settings.Autosell then
-            print("[YBA Enhanced] Автозапуск автопродажи (из файла настроек)...")
             task.wait(0.5)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
             if Options.Autosell then
                 Options.Autosell:SetValue(true)
-                print("[YBA Enhanced] Тумблер Autosell установлен в ON")
+                
             end
             
             -- КРИТИЧНО: Проверяем что SellItems не пустой
@@ -551,18 +524,17 @@ task.spawn(function()
                 
                 -- УБРАНО: Уведомление при автозапуске
             else
-                print("[YBA Enhanced] ОШИБКА: SellItems пустой! Автопродажа НЕ запущена!")
+                
                 -- УБРАНО: Уведомление об ошибке
             end
         end
         
         -- Если детектор читеров был включен - запускаем
         if Settings and Settings.AutoServerHop then
-            print("[YBA Enhanced] Автозапуск детектора читеров (из настроек)...")
             StartCheaterDetection()
         end
         
-        print("[YBA Enhanced] Обычный запуск завершен!")
+        
     end
 end)
 
@@ -656,7 +628,7 @@ local Options = {}
 
 -- Global variables
 
--- Global variables 
+-- Global variables
 local isFlying = false
 local flyConnections = {}
 local isNoClipping = false
@@ -818,7 +790,7 @@ local function SaveConfigToServer()
             Body = HttpService:JSONEncode(config)
         })
         
-        print("[YBA Enhanced] Полный конфиг сохранен на сервер")
+        
     end)
 end
 
@@ -833,7 +805,7 @@ local function LoadConfigFromServer()
         
         if response and response.StatusCode == 200 then
             local serverConfig = HttpService:JSONDecode(response.Body)
-            print("[YBA Enhanced] Конфиг загружен с сервера")
+            
             
             -- Конвертируем RGB таблицы в Color3
             local function rgbToColor(rgb)
@@ -904,7 +876,7 @@ local function LoadConfigFromServer()
             _G.YBASellItems = Settings.SellItems
             _G.YBAESPEnabled = ESPSettings.Enabled
             
-            print("[YBA Enhanced] Настройки применены из серверного конфига")
+            
             return true
         end
         return false
@@ -924,21 +896,17 @@ local function loadSettings()
         -- КРИТИЧНО: Загружаем состояние автофарма и автоселла
         if saved.Autofarm ~= nil then
             Settings.Autofarm = saved.Autofarm
-            print("[YBA Enhanced] Загружено Autofarm: " .. tostring(Settings.Autofarm))
         end
         if saved.Autosell ~= nil then
             Settings.Autosell = saved.Autosell
-            print("[YBA Enhanced] Загружено Autosell: " .. tostring(Settings.Autosell))
         end
         if saved.FarmItems and type(saved.FarmItems) == "table" then
             Settings.FarmItems = saved.FarmItems
-            print("[YBA Enhanced] Загружено FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
         else
             Settings.FarmItems = {}
         end
         if saved.SellItems and type(saved.SellItems) == "table" then
             Settings.SellItems = saved.SellItems
-            print("[YBA Enhanced] Загружено SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
         else
             Settings.SellItems = {}
         end
@@ -949,13 +917,13 @@ local function loadSettings()
             if saved.ESPColors.Name then Colors.Name = Color3.fromRGB(saved.ESPColors.Name.R, saved.ESPColors.Name.G, saved.ESPColors.Name.B) end
         end
     else
-        Settings = table.clone(DefaultSettings)
+        Settings = table_copy(DefaultSettings)
     end
 end
 
 local function saveSettings()
     pcall(function()
-        local settingsToSave = table.clone(Settings)
+        local settingsToSave = table_copy(Settings)
         settingsToSave.Autofarm = Settings.Autofarm  -- КРИТИЧНО: Сохраняем состояние автофарма
         settingsToSave.Autosell = Settings.Autosell  -- КРИТИЧНО: Сохраняем состояние автоселла
         settingsToSave.AutoServerHop = Settings.AutoServerHop  -- КРИТИЧНО: Сохраняем Auto Server Hop
@@ -966,23 +934,21 @@ local function saveSettings()
         
         local jsonData = game:GetService("HttpService"):JSONEncode(settingsToSave)
         writefile("YBA_Enhanced_Settings.json", jsonData)
-        
-        print("[YBA Enhanced] Настройки сохранены: Autofarm=" .. tostring(Settings.Autofarm) .. ", Autosell=" .. tostring(Settings.Autosell) .. ", AutoServerHop=" .. tostring(Settings.AutoServerHop))
     end)
 end
 
 -- КРИТИЧНО: Инициализируем Settings перед загрузкой
-Settings = table.clone(DefaultSettings)
+Settings = table_copy(DefaultSettings)
 
 -- КРИТИЧНО: СНАЧАЛА пытаемся загрузить ПОЛНЫЙ конфиг с сервера
 local serverConfigLoaded = LoadConfigFromServer()
 
 -- КРИТИЧНО: Загружаем локальный файл ТОЛЬКО если серверный конфиг НЕ загрузился
 if not serverConfigLoaded then
-    print("[YBA Enhanced] Серверный конфиг не загрузился, используем локальный файл")
+    
     loadSettings()
 else
-    print("[YBA Enhanced] Серверный конфиг загрузился успешно, локальный файл ИГНОРИРУЕТСЯ")
+    
 end
 
 -- КРИТИЧНО: Инициализируем _G переменные при старте скрипта
@@ -1005,64 +971,58 @@ end
 -- КРИТИЧНО: Восстанавливаем настройки из _G если они есть
 if _G.YBAAutoFarmEnabled ~= nil then
     Settings.Autofarm = _G.YBAAutoFarmEnabled
-    print("[YBA Enhanced] Восстановлено Autofarm: " .. tostring(Settings.Autofarm))
 end
 if _G.YBAAutoSellEnabled ~= nil then
     Settings.Autosell = _G.YBAAutoSellEnabled
-    print("[YBA Enhanced] Восстановлено Autosell: " .. tostring(Settings.Autosell))
 end
 if _G.YBAAutoServerHop ~= nil then
     Settings.AutoServerHop = _G.YBAAutoServerHop
-    print("[YBA Enhanced] Восстановлено AutoServerHop: " .. tostring(Settings.AutoServerHop))
 end
 if _G.YBAFarmItems ~= nil then
     Settings.FarmItems = _G.YBAFarmItems
-    print("[YBA Enhanced] Восстановлено FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
 end
 if _G.YBASellItems ~= nil then
     Settings.SellItems = _G.YBASellItems
-    print("[YBA Enhanced] Восстановлено SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
 end
 
 -- ИСПРАВЛЕНО: Восстанавливаем счетчики из _G если они есть
 if _G.YBAItemsCollected then
     farmStats.itemsCollected = _G.YBAItemsCollected
     farmStats.prevItemsCollected = _G.YBAItemsCollected
-    print("[YBA Enhanced] Восстановлено itemsCollected: " .. farmStats.itemsCollected)
+    
 end
 if _G.YBAMoneyCollected then
     farmStats.moneyCollected = _G.YBAMoneyCollected
     farmStats.prevMoneyCollected = _G.YBAMoneyCollected
-    print("[YBA Enhanced] Восстановлено moneyCollected: " .. farmStats.moneyCollected)
+    
 end
 if _G.YBAItemsSold then
     farmStats.itemsSold = _G.YBAItemsSold
     farmStats.prevItemsSold = _G.YBAItemsSold
-    print("[YBA Enhanced] Восстановлено itemsSold: " .. farmStats.itemsSold)
+    
 end
 if _G.YBAMoneySold then
     farmStats.moneySold = _G.YBAMoneySold
     farmStats.prevMoneySold = _G.YBAMoneySold
-    print("[YBA Enhanced] Восстановлено moneySold: " .. farmStats.moneySold)
+    
 end
 if _G.YBAServerHops then
     farmStats.serverHops = _G.YBAServerHops
-    print("[YBA Enhanced] Восстановлено serverHops: " .. farmStats.serverHops)
+    
 else
     -- ИСПРАВЛЕНО: Инициализируем serverHops если его нет
     farmStats.serverHops = 0
-    print("[YBA Enhanced] serverHops инициализирован: 0")
+    
 end
 if _G.YBAStartTime then
     farmStats.startTime = _G.YBAStartTime
     local totalUptime = math.floor(tick() - farmStats.startTime)
-    print("[YBA Enhanced] Восстановлено startTime: общее время работы " .. totalUptime .. " секунд")
+    
 end
 
 -- КРИТИЧНО: Восстанавливаем состояние ESP из _G
 if _G.YBAESPEnabled ~= nil then
     ESPSettings.Enabled = _G.YBAESPEnabled
-    print("[YBA Enhanced] Восстановлено ESPEnabled: " .. tostring(ESPSettings.Enabled))
 end
 
 -- Server Hop Function (ДОЛЖНА БЫТЬ ПЕРЕД StartCheaterDetection)
@@ -1084,18 +1044,14 @@ local function ServerHop()
     -- КРИТИЧНО: Сохраняем дропдауны ИЗ Options.Value (а не из Settings!)
     if Options and Options.FarmItems and Options.FarmItems.Value then
         _G.YBAFarmItems = Options.FarmItems.Value
-        print("[ServerHop] Сохранение FarmItems из Options.Value: " .. HttpService:JSONEncode(_G.YBAFarmItems))
     else
         _G.YBAFarmItems = Settings.FarmItems
-        print("[ServerHop] Сохранение FarmItems из Settings (фоллбэк): " .. HttpService:JSONEncode(_G.YBAFarmItems))
     end
     
     if Options and Options.SellItems and Options.SellItems.Value then
         _G.YBASellItems = Options.SellItems.Value
-        print("[ServerHop] Сохранение SellItems из Options.Value: " .. HttpService:JSONEncode(_G.YBASellItems))
     else
         _G.YBASellItems = Settings.SellItems
-        print("[ServerHop] Сохранение SellItems из Settings (фоллбэк): " .. HttpService:JSONEncode(_G.YBASellItems))
     end
     
     _G.YBAAutoServerHop = Settings.AutoServerHop
@@ -1108,20 +1064,9 @@ local function ServerHop()
     _G.YBAServerHops = (farmStats.serverHops or 0) + 1  -- Увеличиваем счетчик свапов
     _G.YBAStartTime = farmStats.startTime  -- Сохраняем начальное время
     
-    print("[YBA Enhanced] === СОХРАНЕНИЕ СТАТИСТИКИ ПЕРЕД СВАПОМ ===")
-    print("[YBA Enhanced] Настройки:")
-    print("[YBA Enhanced]   Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-    print("[YBA Enhanced]   Autosell: " .. tostring(_G.YBAAutoSellEnabled))
-    print("[YBA Enhanced]   AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
-    print("[YBA Enhanced] Статистика:")
-    print("[YBA Enhanced]   Собрано предметов: " .. _G.YBAItemsCollected)
-    print("[YBA Enhanced]   Собрано денег: $" .. _G.YBAMoneyCollected)
-    print("[YBA Enhanced]   Продано предметов: " .. _G.YBAItemsSold)
-    print("[YBA Enhanced]   Продано денег: $" .. _G.YBAMoneySold)
-    print("[YBA Enhanced]   Свапов сервера: " .. _G.YBAServerHops)
     local totalUptime = math.floor(tick() - _G.YBAStartTime)
-    print("[YBA Enhanced]   Общее время работы: " .. totalUptime .. " секунд")
-    print("[YBA Enhanced] =================================================")
+    
+    
     
     -- КРИТИЧНО: Отправляем статистику НА СЕРВЕР ПЕРЕД СВАПОМ
     pcall(function()
@@ -1173,7 +1118,7 @@ local function ServerHop()
             autosell_status = Settings.Autosell
         }
         
-        print("[YBA Enhanced] Отправка статистики перед свапом на http://localhost:5000/api/server_hop")
+        
         
         local response = request({
             Url = "http://localhost:5000/api/server_hop",
@@ -1183,9 +1128,9 @@ local function ServerHop()
         })
         
         if response and response.StatusCode == 200 then
-            print("[YBA Enhanced] Статистика успешно отправлена на сервер (код: " .. response.StatusCode .. ")")
+            -- Success
         else
-            print("[YBA Enhanced] ОШИБКА отправки статистики: код " .. (response and response.StatusCode or "nil"))
+            -- Error
         end
     end)
     
@@ -1193,7 +1138,7 @@ local function ServerHop()
     local queueteleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
     
     if queueteleport then
-        print("[YBA Enhanced] queue_on_teleport поддерживается! Скрипт загрузится автоматически.")
+        
         
         -- ЗАМЕНИ URL НА СВОЙ!
         local scriptURL = "https://raw.githubusercontent.com/cbozovcloh781-hub/jhkfjhkifhjikefgohjieukdfglowaehjikflou/refs/heads/main/njkclashslnjkqadiqsdujlouijlqdnl_yba"
@@ -1206,7 +1151,7 @@ local function ServerHop()
             Duration = 3
         })
     else
-        print("[YBA Enhanced] queue_on_teleport НЕ поддерживается. Используй autoloader.")
+        
         Library:Notify({
             Title = "Внимание",
             Content = "Используй autoloader для автозагрузки!",
@@ -1239,9 +1184,9 @@ local function ServerHop()
                 if #availableServers > 0 then
                     local randomServer = availableServers[math.random(1, #availableServers)]
                     
-                    print("[YBA Enhanced] Попытка " .. retryCount .. "/" .. maxRetries)
-                    print("[YBA Enhanced] Найдено серверов: " .. #availableServers)
-                    print("[YBA Enhanced] Телепорт на сервер: " .. randomServer)
+                    
+                    
+                    
                     
                     -- НОВОЕ: Используем TeleportAsync с обработкой ошибок
                     local teleportOptions = Instance.new("TeleportOptions")
@@ -1259,15 +1204,14 @@ local function ServerHop()
                         end)
                         
                         if teleportSuccess then
-                            print("[YBA Enhanced] Телепорт успешен!")
+                            
                             return true
                         else
                             teleportError = tostring(teleportResult)
-                            print("[YBA Enhanced] Ошибка телепорта (попытка " .. teleportAttempt .. "/3): " .. teleportError)
                             
                             -- Если сервер полный - пробуем другой сервер
                             if teleportError:find("GameFull") or teleportError:find("full") then
-                                print("[YBA Enhanced] Сервер полный! Ищем другой сервер...")
+                                
                                 Library:Notify({
                                     Title = "Свап сервера",
                                     Content = "Сервер полный! Попытка " .. retryCount .. "/" .. maxRetries,
@@ -1286,7 +1230,7 @@ local function ServerHop()
                         return false
                     end
                 else
-                    print("[YBA Enhanced] Нет доступных серверов")
+                    
                     Library:Notify({
                         Title = "Ошибка",
                         Content = "Не найдено доступных серверов",
@@ -1301,7 +1245,7 @@ local function ServerHop()
             teleportSuccess = true
             break
         else
-            print("[YBA Enhanced] Попытка " .. retryCount .. " неудачна. Ищем другой сервер...")
+            
             task.wait(2)  -- Задержка перед следующей попыткой
         end
     end
@@ -1312,7 +1256,7 @@ local function ServerHop()
             Content = "Не удалось найти доступный сервер за " .. maxRetries .. " попыток",
             Duration = 5
         })
-        print("[YBA Enhanced] КРИТИЧЕСКАЯ ОШИБКА: Не удалось сменить сервер за " .. maxRetries .. " попыток")
+        
     end
 end
 
@@ -1351,7 +1295,7 @@ local function StartCheaterDetection()
                     if Settings.DebugMode and oldCount > 0 then
                         local player = Players:GetPlayerByUserId(userId)
                         if player then
-                            print("[Cheater Detection] Варнинги сброшены для " .. player.Name .. " (было: " .. oldCount .. ")")
+                            -- Debug info
                         end
                     end
                 end
@@ -1380,7 +1324,7 @@ local function StartCheaterDetection()
                             afkFarmersCount = afkFarmersCount + 1
                             
                             if Settings.DebugMode then
-                                print("[Cheater Detection] AFK фармер обнаружен: " .. player.Name .. " (расстояние: " .. math.floor(distance) .. " стадов)")
+                                -- Debug: AFK farmer detected
                             end
                         end
                     end
@@ -1395,7 +1339,7 @@ local function StartCheaterDetection()
                     })
                     
                     if Settings.DebugMode then
-                        print("[Cheater Detection] Обнаружено " .. afkFarmersCount .. " AFK фармеров возле крана. Свап сервера...")
+                        
                     end
                     
                     task.wait(3)
@@ -1457,7 +1401,7 @@ local function StartCheaterDetection()
                                         return
                                     end
                                 elseif Settings.DebugMode then
-                                    print("[Cheater Detection] " .. player.Name .. " подозрителен (" .. warningCount .. "/" .. Settings.CheaterDetectionSensitivity .. ") - скорость: " .. math.floor(speed) .. " стадов/сек")
+                                    -- Debug: Speed detected
                                 end
                             end
                         end
@@ -1942,21 +1886,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- УВЕЛИЧЕННАЯ СКОРОСТЬ (максимально быстро)
+    -- ОПТИМАЛЬНАЯ СКОРОСТЬ (понижено для стабильности)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 32
+        stepSize = 30
         stepDelay = 0.025
     elseif distance < 300 then
-        stepSize = 38
+        stepSize = 36
         stepDelay = 0.022
     elseif distance < 600 then
         stepSize = 42
-        stepDelay = 0.020
+        stepDelay = 0.019
     else
-        stepSize = 45
-        stepDelay = 0.018
+        stepSize = 46
+        stepDelay = 0.016
     end
     
     local direction = (targetPos - startPos).Unit
@@ -2051,6 +1995,7 @@ local function TeleportToPlatform()
     local character = Player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     
+    if not farmPlatform then return end
     local targetPos = farmPlatform.Position + Vector3.new(math.random(-8, 8), 3, math.random(-8, 8))
     bypassTeleport(targetPos)
 end
@@ -2112,19 +2057,19 @@ end
 
 local function StartAutofarm()
     if isAutofarmEnabled then
-        print("[Autofarm] Автофарм уже запущен, пропускаем")
+        -- УБРАНО: 
         return
     end
     
-    print("[Autofarm] === ЗАПУСК АВТОФАРМА ===")
+    -- УБРАНО: 
     
     -- КРИТИЧНО: Очищаем ВСЕ старые соединения ПЕРЕД запуском
-    print("[Autofarm] Очистка старых connections...")
+    -- УБРАНО: 
     for key, connection in pairs(autofarmConnections) do
         pcall(function()
             if typeof(connection) == "RBXScriptConnection" then
                 connection:Disconnect()
-                print("[Autofarm] Отключен connection: " .. tostring(key))
+                -- УБРАНО: )
             end
         end)
     end
@@ -2134,7 +2079,7 @@ local function StartAutofarm()
     if _G.YBAAutofarmThread then
         pcall(function()
             task.cancel(_G.YBAAutofarmThread)
-            print("[Autofarm] Остановлен старый поток автофарма")
+            -- УБРАНО: 
         end)
         _G.YBAAutofarmThread = nil
     end
@@ -2143,7 +2088,7 @@ local function StartAutofarm()
     task.wait(0.5)
     
     isAutofarmEnabled = true
-    print("[Autofarm] isAutofarmEnabled = true")
+    -- УБРАНО: 
     
     -- КРИТИЧНО: Обновляем _G переменные при запуске автофарма
     _G.YBAAutoFarmEnabled = true
@@ -2156,9 +2101,9 @@ local function StartAutofarm()
         farmStats.moneyCollected = 0
         farmStats.moneySold = 0
         farmStats.startTime = tick()
-        print("[Autofarm] Счетчики инициализированы")
+        -- УБРАНО: 
     else
-        print("[Autofarm] Продолжение фарма. Собрано: " .. farmStats.itemsCollected .. ", Продано: " .. farmStats.itemsSold)
+        -- УБРАНО: 
     end
     
     if not farmPlatform then
@@ -2177,6 +2122,7 @@ local function StartAutofarm()
     
     local platformTimer = 0
     local onPlatform = false
+    if not farmPlatform then return end
     local platformPos = farmPlatform.Position
     local mapPatrolPoints = {
         Vector3.new(platformPos.X, -60, platformPos.Z),
@@ -2191,7 +2137,7 @@ local function StartAutofarm()
     
     -- КРИТИЧНО: Сохраняем поток в _G для возможности остановки
     _G.YBAAutofarmThread = task.spawn(function()
-        print("[Autofarm] Поток автофарма запущен")
+        -- УБРАНО: 
         while isAutofarmEnabled do
             local character = Player.Character
             if character and character:FindFirstChild("HumanoidRootPart") then
@@ -2384,21 +2330,21 @@ local function StartAutofarm()
             end
             task.wait(0.1)
         end
-        print("[Autofarm] Поток автофарма завершен")
+        -- УБРАНО: 
     end)
 end
 
 local function StopAutofarm()
     if not isAutofarmEnabled then return end
     
-    print("[Autofarm] === ОСТАНОВКА АВТОФАРМА ===")
+    -- УБРАНО: 
     isAutofarmEnabled = false
     
     -- КРИТИЧНО: Останавливаем поток автофарма
     if _G.YBAAutofarmThread then
         pcall(function()
             task.cancel(_G.YBAAutofarmThread)
-            print("[Autofarm] Поток автофарма остановлен")
+            -- УБРАНО: 
         end)
         _G.YBAAutofarmThread = nil
     end
@@ -2417,18 +2363,18 @@ local function StopAutofarm()
     end
     
     -- Очищаем все connections
-    print("[Autofarm] Очистка connections...")
+    -- УБРАНО: 
     for key, connection in pairs(autofarmConnections) do
         pcall(function()
             if typeof(connection) == "RBXScriptConnection" then
                 connection:Disconnect()
-                print("[Autofarm] Отключен connection: " .. tostring(key))
+                -- УБРАНО: )
             end
         end)
     end
     autofarmConnections = {}
     
-    print("[Autofarm] Автофарм полностью остановлен")
+    -- УБРАНО: 
 end
 
 -- Money Farm Functions (MUST BE BEFORE StartAutosell)
@@ -2500,7 +2446,7 @@ local function SellItem(itemName)
                 ["Dialogue"] = "Dialogue5"
             }
         }
-        remoteEvent:FireServer(unpack(args))
+        remoteEvent:FireServer(table.unpack(args))
         return true
     end
     
@@ -2566,7 +2512,7 @@ local function StartAutosell()
                         })
                         
                         -- КРИТИЧНО: Отправляем уведомление в Telegram
-                        print("[Autosell] Баланс достиг $1,000,000! Отправка уведомления в Telegram...")
+                        
                         pcall(function()
                             local HttpService = game:GetService("HttpService")
                             local notificationData = {
@@ -2586,9 +2532,9 @@ local function StartAutosell()
                             })
                             
                             if response and response.StatusCode == 200 then
-                                print("[Autosell] Уведомление отправлено успешно!")
+                                -- Success
                             else
-                                print("[Autosell] ОШИБКА отправки уведомления: код " .. (response and response.StatusCode or "nil"))
+                                -- Error
                             end
                         end)
                         
@@ -2635,20 +2581,19 @@ local function StartAutosell()
                         
                         -- Если текущий предмет самый дешевый - продаем его
                         if itemName == cheapestItem then
-                            print("[Autosell] Продажа " .. itemName .. " ($" .. itemPrice .. ") несмотря на превышение лимита (самый дешевый)")
                             Library:Notify({
                                 Title = "Autosell",
                                 Content = "Продажа " .. itemName .. " (самый дешевый) для освобождения места",
                                 Duration = 3
                             })
+                            -- Продолжаем выполнение (продаем предмет)
                         else
                             -- Пропускаем более дорогие предметы
-                            print("[Autosell] Пропуск " .. itemName .. " ($" .. itemPrice .. ") - превысит лимит")
-                            continue
+                            itemName = nil  -- Помечаем для пропуска
                         end
                     end
                     
-                    if SellItem(itemName) then
+                    if itemName and SellItem(itemName) then
                         itemsSold = itemsSold + 1
                         farmStats.itemsSold = (farmStats.itemsSold or 0) + 1
                         farmStats.moneySold = (farmStats.moneySold or 0) + itemPrice
@@ -2696,7 +2641,7 @@ local function DropMoney(amount)
             [2] = tonumber(amount)
         }
         
-        remoteEvent:FireServer(unpack(args))
+        remoteEvent:FireServer(table.unpack(args))
         task.wait(0.5)
         
         return true
@@ -2806,13 +2751,13 @@ local function StartMoneyFarm()
                             SendMoneyNotification(money, Settings.ReceiverUsername)
                         end
                         
-                        print("[Money Farm] Уведомление отправлено. Следующее через 4 часа.")
+                        
                     else
                         -- Показываем сколько осталось до следующего уведомления
                         local timeLeft = fourHours - timeSinceLastNotif
                         local hoursLeft = math.floor(timeLeft / 3600)
                         local minutesLeft = math.floor((timeLeft % 3600) / 60)
-                        print("[Money Farm] Лимит достигнут. Следующее уведомление через " .. hoursLeft .. "ч " .. minutesLeft .. "м")
+                        
                     end
                     
                     -- Wait a minute before next check to avoid spam
@@ -2846,7 +2791,7 @@ local commandHandlerEnabled = false
 local commandHandlerConnection = nil
 
 local function ExecuteCommand(command, args)
-    print("[YBA Enhanced] Выполнение команды: " .. command)
+    
     
     if command == "toggle_autofarm" then
         -- ИСПРАВЛЕНО: Всегда ВКЛЮЧАЕМ автофарм (не переключаем)
@@ -2962,7 +2907,7 @@ local function StartCommandHandler()
     if commandHandlerEnabled then return end
     commandHandlerEnabled = true
     
-    print("[YBA Enhanced] Запуск обработчика команд...")
+    
     
     -- КРИТИЧНО: Автоматическая отправка статистики каждые 5 секунд
     task.spawn(function()
@@ -3064,7 +3009,7 @@ local function StartCommandHandler()
                     
                     if data.command then
                         local cmdResult = HandleCommand(data.command)
-                        print("[Command Handler] Команда: " .. data.command .. ", Результат: " .. cmdResult.message)
+                        
                     end
                 end
             end)
@@ -3087,7 +3032,7 @@ end
 -- farmStats.prevMoneySold = 0
 
 StartCommandHandler()
-print("[YBA Enhanced] Скрипт загружен успешно!")
+
 
 -- Autobuy Functions
 local function BuyLuckyArrow()
@@ -3104,7 +3049,7 @@ local function BuyLuckyArrow()
                 end)
                 task.wait(0.1)
             end
-            print("[Autobuy] Lucky Arrow куплена через GUI магазина")
+            
             return true
         end
         return false
@@ -3127,8 +3072,8 @@ local function BuyLuckyArrow()
         
         local character = Player.Character
         if character and character:FindFirstChild("RemoteEvent") then
-            character.RemoteEvent:FireServer(unpack(args))
-            print("[Autobuy] Lucky Arrow куплена через RemoteEvent")
+            character.RemoteEvent:FireServer(table.unpack(args))
+            
             return true
         end
         return false
@@ -3423,7 +3368,7 @@ end
 
 -- Cleanup function
 local function DestroyAllFunctions()
-    print("[YBA Enhanced] Начало уничтожения скрипта...")
+    
     ScriptDestroyed = true
     
     -- Stop all functions with pcall
@@ -3440,13 +3385,13 @@ local function DestroyAllFunctions()
     pcall(function() if consoleEnabled then StopConsole() end end)
     pcall(function() if commandHandlerEnabled then StopCommandHandler() end end)
     
-    print("[YBA Enhanced] Все функции остановлены")
+    
     
     -- КРИТИЧНО: Удаляем консоль
     pcall(function()
         if Console and Console.Destroy then
             Console.Destroy()
-            print("[YBA Enhanced] Консоль удалена")
+            
         end
     end)
     
@@ -3456,7 +3401,7 @@ local function DestroyAllFunctions()
         local oldConsole = CoreGui:FindFirstChild("DexConsole")
         if oldConsole then
             oldConsole:Destroy()
-            print("[YBA Enhanced] Старая консоль удалена из CoreGui")
+            
         end
     end)
     
@@ -3466,7 +3411,7 @@ local function DestroyAllFunctions()
         CleanupESP()
     end)
     
-    print("[YBA Enhanced] ESP очищен")
+    
     
     -- Disconnect all global connections
     for _, connection in pairs(globalConnections) do
@@ -3480,14 +3425,14 @@ local function DestroyAllFunctions()
     end
     globalConnections = {}
     
-    print("[YBA Enhanced] Все соединения отключены")
+    
     
     -- Destroy platform
     pcall(function()
         DestroyFarmPlatform()
     end)
     
-    print("[YBA Enhanced] Платформа удалена")
+    
     
     -- Destroy UI
     pcall(function()
@@ -3496,7 +3441,7 @@ local function DestroyAllFunctions()
         end
     end)
     
-    print("[YBA Enhanced] UI уничтожен")
+    
     
     -- Clear all settings to prevent restart
     Settings.Fly = false
@@ -3513,7 +3458,7 @@ local function DestroyAllFunctions()
     _G.YBAEnhancedLoaded = false
     _G.YBAEnhancedCleanup = nil
     
-    print("[YBA Enhanced] Скрипт полностью уничтожен!")
+    
 end
 
 -- Сохраняем функцию очистки в глобальную переменную
@@ -3737,37 +3682,22 @@ Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
     Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
     Callback = function(Value)
         if isSettingDropdownProgrammatically then
-            print("[YBA Enhanced] FarmItems Callback пропущен (программная установка)")
             return
         end
         Settings.FarmItems = Value
         saveSettings()
         SaveConfigToServer()
         _G.YBAFarmItems = Value
-        print("[YBA Enhanced] FarmItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
 
 -- КРИТИЧНО: Устанавливаем значение НАПРЯМУЮ без вызова Callback
 if Settings.FarmItems and next(Settings.FarmItems) ~= nil then
-    print("[YBA Enhanced] Установка FarmItems напрямую в .Value...")
-    print("[YBA Enhanced] Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
-    
     -- ПРЯМОЕ присваивание без SetValue
     Options.FarmItems.Value = Settings.FarmItems
-    
-    print("[YBA Enhanced] Options.FarmItems.Value установлен: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
 else
-    print("[YBA Enhanced] Settings.FarmItems пустой, пропускаем установку")
+    -- No items
 end
-
-print("[YBA Enhanced] === ДРОПДАУН FarmItems СОЗДАН ===")
-print("[YBA Enhanced] Options.FarmItems существует: " .. tostring(Options.FarmItems ~= nil))
-if Options.FarmItems then
-    print("[YBA Enhanced] Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value or {}))
-end
-print("[YBA Enhanced] Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems or {}))
-print("[YBA Enhanced] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems or {}))
 
 Options.Autosell = AutoTab:AddToggle("Autosell", {
     Title = "💰 Auto Sell Items",
@@ -3797,51 +3727,30 @@ Options.SellItems = AutoTab:AddDropdown("SellItems", {
     Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
     Callback = function(Value)
         if isSettingDropdownProgrammatically then
-            print("[YBA Enhanced] SellItems Callback пропущен (программная установка)")
             return
         end
         Settings.SellItems = Value
         saveSettings()
         SaveConfigToServer()
         _G.YBASellItems = Value
-        print("[YBA Enhanced] SellItems обновлены пользователем: " .. game:GetService("HttpService"):JSONEncode(Value))
     end
 })
 
 -- КРИТИЧНО: Устанавливаем значение НАПРЯМУЮ без вызова Callback
 if Settings.SellItems and next(Settings.SellItems) ~= nil then
-    print("[YBA Enhanced] Установка SellItems напрямую в .Value...")
-    print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
-    
     -- ПРЯМОЕ присваивание без SetValue
     Options.SellItems.Value = Settings.SellItems
-    
-    print("[YBA Enhanced] Options.SellItems.Value установлен: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
 else
-    print("[YBA Enhanced] Settings.SellItems пустой, пропускаем установку")
+    -- No items
 end
-
-print("[YBA Enhanced] === ДРОПДАУН SellItems СОЗДАН ===")
-print("[YBA Enhanced] Options.SellItems существует: " .. tostring(Options.SellItems ~= nil))
-if Options.SellItems then
-    print("[YBA Enhanced] Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value or {}))
-end
-print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
-print("[YBA Enhanced] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems or {}))
 
 -- КРИТИЧНО: Восстанавливаем выбранные предметы из _G (СРАЗУ ПОСЛЕ создания обоих дропдаунов)
-print("[YBA Enhanced] === НАЧАЛО ВОССТАНОВЛЕНИЯ ДРОПДАУНОВ ===")
-print("[YBA Enhanced] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems or {}))
-print("[YBA Enhanced] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems or {}))
-print("[YBA Enhanced] Options.FarmItems существует: " .. tostring(Options.FarmItems ~= nil))
-print("[YBA Enhanced] Options.SellItems существует: " .. tostring(Options.SellItems ~= nil))
 
 -- КРИТИЧНО: Восстанавливаем ТУМБЛЕРЫ тоже
 if _G.YBAAutoRestart then
-    print("[YBA Enhanced] Обнаружен флаг автозапуска - восстанавливаем тумблеры...")
+    
     
     if _G.YBAAutoFarmEnabled ~= nil then
-        print("[YBA Enhanced] Восстановление Autofarm тумблера: " .. tostring(_G.YBAAutoFarmEnabled))
         Settings.Autofarm = _G.YBAAutoFarmEnabled
         if Options.Autofarm then
             Options.Autofarm:SetValue(_G.YBAAutoFarmEnabled)
@@ -3849,7 +3758,6 @@ if _G.YBAAutoRestart then
     end
     
     if _G.YBAAutoSellEnabled ~= nil then
-        print("[YBA Enhanced] Восстановление Autosell тумблера: " .. tostring(_G.YBAAutoSellEnabled))
         Settings.Autosell = _G.YBAAutoSellEnabled
         if Options.Autosell then
             Options.Autosell:SetValue(_G.YBAAutoSellEnabled)
@@ -3857,7 +3765,6 @@ if _G.YBAAutoRestart then
     end
     
     if _G.YBAAutoServerHop ~= nil then
-        print("[YBA Enhanced] Восстановление AutoServerHop тумблера: " .. tostring(_G.YBAAutoServerHop))
         Settings.AutoServerHop = _G.YBAAutoServerHop
         if Options.AutoServerHop then
             Options.AutoServerHop:SetValue(_G.YBAAutoServerHop)
@@ -3866,47 +3773,39 @@ if _G.YBAAutoRestart then
 end
 
 if _G.YBAFarmItems and next(_G.YBAFarmItems) ~= nil then
-    print("[YBA Enhanced] Восстановление FarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
     Options.FarmItems:SetValue(_G.YBAFarmItems)
     task.wait(0.2)
     Options.FarmItems.Value = _G.YBAFarmItems
     Settings.FarmItems = _G.YBAFarmItems
-    print("[YBA Enhanced] FarmItems восстановлены в UI")
-    print("[YBA Enhanced]   Options.FarmItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.FarmItems.Value))
-    print("[YBA Enhanced]   Settings.FarmItems: " .. game:GetService("HttpService"):JSONEncode(Settings.FarmItems))
     
     -- КРИТИЧНО: Если автофарм был активен - перезапускаем его
     if _G.YBAAutoFarmEnabled and isAutofarmEnabled then
-        print("[YBA Enhanced] Перезапуск автофарма после восстановления дропдауна...")
+        
         StopAutofarm()
         task.wait(0.5)
         StartAutofarm()
-        print("[YBA Enhanced] Автофарм перезапущен успешно")
+        
     end
 else
-    print("[YBA Enhanced] _G.YBAFarmItems пустой или не существует, пропускаем восстановление")
+    
 end
 
 if _G.YBASellItems and next(_G.YBASellItems) ~= nil then
-    print("[YBA Enhanced] Восстановление SellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
     Options.SellItems:SetValue(_G.YBASellItems)
     task.wait(0.2)
     Options.SellItems.Value = _G.YBASellItems
     Settings.SellItems = _G.YBASellItems
-    print("[YBA Enhanced] SellItems восстановлены в UI")
-    print("[YBA Enhanced]   Options.SellItems.Value: " .. game:GetService("HttpService"):JSONEncode(Options.SellItems.Value))
-    print("[YBA Enhanced]   Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems))
     
     -- КРИТИЧНО: Если автоселл был активен - перезапускаем его
     if _G.YBAAutoSellEnabled and isAutosellEnabled then
-        print("[YBA Enhanced] Перезапуск автоселла после восстановления дропдауна...")
+        
         StopAutosell()
         task.wait(0.5)
         StartAutosell()
-        print("[YBA Enhanced] Автоселл перезапущен успешно")
+        
     end
 else
-    print("[YBA Enhanced] _G.YBASellItems пустой или не существует, пропускаем восстановление")
+    
 end
 
 -- === СТАТИСТИКА ===
@@ -4174,7 +4073,7 @@ AutoTab:AddButton({
             Duration = 3
         })
         
-        print("[Money Farm] Текущий баланс: $" .. money)
+        
     end
 })
 
@@ -4510,7 +4409,7 @@ function Console.AddLog(text, color)
         end
         
         consoleOutput.Text = newText
-        print("[Console] Автоочистка: удалено " .. halfPoint .. " старых строк")
+        
     end
     
     -- НОВОЕ: Добавляем ЧИСТЫЙ текст в TextBox (для копирования)
@@ -4609,7 +4508,7 @@ function Console.Destroy()
         consoleOutput = nil
         consoleInput = nil
         consoleEnabled = false
-        print("[YBA Enhanced] Консоль закрыта")
+        
     end
 end
 
@@ -4644,7 +4543,7 @@ ScriptContext.Error:Connect(function(message, stack, script)
     end
 end)
 
-print("[YBA Enhanced] Консоль встроена и готова к использованию")
+
 
 local consoleEnabled = false
 
@@ -4717,7 +4616,7 @@ if Settings.CustomConsole then
     task.spawn(function()
         task.wait(1)
         StartConsole()
-        print("[YBA Enhanced] Консоль открыта автоматически")
+        
     end)
 end
 
@@ -4750,16 +4649,13 @@ DebugTab:AddButton({
                 Content = itemName .. " на расстоянии " .. math.floor(distance) .. " стадов",
                 Duration = 5
             })
-            print("[DEBUG] Найден предмет: " .. itemName)
-            print("[DEBUG] Позиция: " .. tostring(item.Position))
-            print("[DEBUG] Расстояние: " .. distance)
-        else
+ else
             Library:Notify({
                 Title = "Тест: Предмет не найден",
                 Content = "Нет предметов для фарма поблизости",
                 Duration = 3
             })
-            print("[DEBUG] Предметы не найдены")
+            
         end
     end
 })
@@ -4788,7 +4684,7 @@ DebugTab:AddButton({
                 Content = "Время: " .. string.format("%.2f", elapsed) .. "с",
                 Duration = 3
             })
-            print("[DEBUG] Телепорт завершен за " .. elapsed .. " секунд")
+            
         else
             Library:Notify({
                 Title = "Тест: Ошибка",
@@ -4894,14 +4790,14 @@ DebugTab:AddButton({
                     Content = itemName .. " подобран за " .. attempts .. " попыток",
                     Duration = 5
                 })
-                print("[DEBUG] Предмет подобран успешно за " .. attempts .. " попыток")
+                
             else
                 Library:Notify({
                     Title = "Тест: Неудача",
                     Content = "Не удалось подобрать " .. itemName .. " за 15 попыток",
                     Duration = 5
                 })
-                print("[DEBUG] Не удалось подобрать предмет")
+                
             end
         else
             Library:Notify({
@@ -4926,7 +4822,7 @@ DebugTab:AddButton({
             Content = "Телепорт завершен за " .. string.format("%.2f", elapsed) .. "с",
             Duration = 3
         })
-        print("[DEBUG] Телепорт на платформу за " .. elapsed .. " секунд")
+        
     end
 })
 
@@ -4940,8 +4836,6 @@ DebugTab:AddButton({
             Content = stuck and "Игрок застрял!" or "Игрок не застрял",
             Duration = 3
         })
-        print("[DEBUG] Застревание: " .. tostring(stuck))
-        print("[DEBUG] Счетчик застреваний: " .. stuckCounter)
     end
 })
 
@@ -4965,9 +4859,9 @@ DebugTab:AddButton({
                     Content = table.concat(itemList, ", "),
                     Duration = 5
                 })
-                print("[DEBUG] Выбранные предметы для фарма:")
+                
                 for _, item in ipairs(itemList) do
-                    print("  - " .. item)
+                    
                 end
             else
                 Library:Notify({
@@ -5040,23 +4934,8 @@ DebugTab:AddButton({
             Duration = 8
         })
         
-        print("[DEBUG] === Статистика фарма ===")
-        print("[DEBUG] Предметов собрано: " .. farmStats.itemsCollected .. " на сумму $" .. farmStats.moneyCollected)
-        print("[DEBUG] Предметов продано: " .. farmStats.itemsSold .. " на сумму $" .. farmStats.moneySold)
-        print("[DEBUG] Время работы: " .. uptimeStr)
-        print("[DEBUG] Автофарм: " .. (isAutofarmEnabled and "Активен" or "Неактивен"))
-        print("[DEBUG] Автопродажа: " .. (isAutosellEnabled and "Активна" or "Неактивна"))
-        print("[DEBUG] ")
-        print("[DEBUG] === Инвентарь ===")
-        print("[DEBUG] Всего предметов: " .. totalItems)
-        print("[DEBUG] Можно продать: " .. sellableItems .. " предметов на $" .. sellableValue)
-        print("[DEBUG] Lucky Arrow: " .. luckyArrows)
-        print("[DEBUG] Lucky Stone Mask: " .. luckyMasks)
-        print("[DEBUG] ")
-        print("[DEBUG] Список предметов:")
         for itemName, count in pairs(inventoryList) do
             local price = itemPrices[itemName] or 0
-            print("[DEBUG]   - " .. itemName .. " x" .. count .. " ($" .. (price * count) .. ")")
         end
     end
 })
@@ -5087,8 +4966,6 @@ DebugTab:AddButton({
             Content = mode .. ": " .. string.format("%.3f", elapsed) .. "с на 1000 стадов",
             Duration = 5
         })
-        print("[DEBUG] Скорость телепорта (" .. mode .. "): " .. elapsed .. " секунд")
-        print("[DEBUG] Скорость: " .. (1000/elapsed) .. " стадов/сек")
         
         -- Возвращаемся обратно
         task.wait(1)
@@ -5120,20 +4997,19 @@ DebugTab:AddButton({
             Content = "Статус: " .. status .. "\nПодтверждено: " .. detectedCheatersCount .. "/3\nПодозрительных: " .. suspiciousCount,
             Duration = 5
         })
-        print("[DEBUG] Детектор читеров: " .. status)
-        print("[DEBUG] Обнаружено читеров: " .. detectedCheatersCount .. "/3")
-        print("[DEBUG] Подозрительных игроков: " .. suspiciousCount)
-        print("[DEBUG] Чувствительность: " .. Settings.CheaterDetectionSensitivity)
+        
+        
+        
+        
         
         -- НОВОЕ: Выводим детали по каждому подозрительному
         if suspiciousCount > 0 then
-            print("[DEBUG] === Подозрительные игроки ===")
+            
             for userId, data in pairs(cheaterDetections) do
                 if data.count and data.count > 0 then
                     local player = Players:GetPlayerByUserId(userId)
                     local playerName = player and player.Name or "Unknown"
                     local timeSinceWarning = data.lastWarning and math.floor(tick() - data.lastWarning) or 0
-                    print("[DEBUG]   " .. playerName .. ": " .. data.count .. "/" .. Settings.CheaterDetectionSensitivity .. " варнингов (последний: " .. timeSinceWarning .. "с назад)")
                 end
             end
         end
@@ -5150,7 +5026,7 @@ DebugTab:AddButton({
             Duration = 2
         })
         
-        print("[DEBUG] === Мониторинг скорости игроков ===")
+        
         
         task.spawn(function()
             local tempPositions = {}
@@ -5180,12 +5056,11 @@ DebugTab:AddButton({
                         local speed = distance / timeDiff
                         
                         local status = speed > 400 and "[ЧИТЕР]" or "[OK]"
-                        print("[DEBUG] " .. status .. " " .. player.Name .. ": " .. math.floor(speed) .. " стадов/сек")
                     end
                 end
             end
             
-            print("[DEBUG] === Мониторинг завершен ===")
+            
             Library:Notify({
                 Title = "Мониторинг",
                 Content = "Данные выведены в консоль",
@@ -5205,8 +5080,6 @@ DebugTab:AddButton({
             Duration = 3
         })
         
-        print("[DEBUG] Тестовый свап сервера (без сохранения)")
-        
         task.wait(2)
         
         local TeleportService = game:GetService("TeleportService")
@@ -5225,11 +5098,11 @@ DebugTab:AddButton({
                     end
                 end
                 
-                print("[DEBUG] Найдено серверов: " .. #availableServers)
+                
                 
                 if #availableServers > 0 then
                     local randomServer = availableServers[math.random(1, #availableServers)]
-                    print("[DEBUG] Телепорт на сервер: " .. randomServer)
+                    
                     
                     Library:Notify({
                         Title = "Тест: Свап",
@@ -5249,7 +5122,6 @@ DebugTab:AddButton({
         end)
         
         if not success then
-            print("[DEBUG] Ошибка свапа: " .. tostring(result))
             Library:Notify({
                 Title = "Тест: Ошибка",
                 Content = "Не удалось получить список серверов",
@@ -5273,7 +5145,7 @@ DebugTab:AddButton({
             Content = "Счетчик читеров сброшен",
             Duration = 3
         })
-        print("[DEBUG] Счетчик читеров сброшен")
+        
     end
 })
 
@@ -5287,7 +5159,7 @@ DebugTab:AddButton({
             Duration = 2
         })
         
-        print("[DEBUG] === Тест нажатия кнопки Play ===")
+        
         
         task.spawn(function()
             local maxAttempts = 10
@@ -5296,43 +5168,41 @@ DebugTab:AddButton({
             
             while attempts < maxAttempts do
                 attempts = attempts + 1
-                print("[DEBUG] Попытка " .. attempts .. "/" .. maxAttempts)
+                
                 
                 local success = pcall(function()
                     local player = game:GetService("Players").LocalPlayer
                     local playerGui = player:WaitForChild("PlayerGui", 2)
                     
                     if playerGui then
-                        print("[DEBUG] PlayerGui найден")
+                        
                         local loadingScreen = playerGui:FindFirstChild("LoadingScreen")
                         
                         if loadingScreen then
-                            print("[DEBUG] LoadingScreen найден!")
-                            print("[DEBUG] Путь: game.Players.LocalPlayer.PlayerGui.LoadingScreen")
+                            
+                            
                             
                             local frames = loadingScreen:FindFirstChild("Frames")
                             if frames then
-                                print("[DEBUG] Frames найден!")
-                                print("[DEBUG] Путь: ...LoadingScreen.Frames")
+                                
+                                
                                 
                                 local main = frames:FindFirstChild("Main")
                                 if main then
-                                    print("[DEBUG] Main найден!")
-                                    print("[DEBUG] Путь: ...Frames.Main")
+                                    
+                                    
                                     
                                     local playButton = main:FindFirstChild("Play")
                                     if playButton then
-                                        print("[DEBUG] Кнопка Play найдена!")
-                                        print("[DEBUG] Полный путь: game.Players.LocalPlayer.PlayerGui.LoadingScreen.Frames.Main.Play")
-                                        print("[DEBUG] Тип: " .. playButton.ClassName)
-                                        print("[DEBUG] Visible: " .. tostring(playButton.Visible))
+                                        
+                                        
+                                        
                                         
                                         if playButton:IsA("GuiObject") then
-                                            print("[DEBUG] Active: " .. tostring(playButton.Active))
                                         end
                                         
                                         -- Нажимаем кнопку несколько раз разными методами
-                                        print("[DEBUG] Попытка нажатия кнопки...")
+                                        
                                         for i = 1, 5 do
                                             pcall(function()
                                                 if playButton:IsA("GuiButton") or playButton:IsA("TextButton") or playButton:IsA("ImageButton") then
@@ -5340,11 +5210,9 @@ DebugTab:AddButton({
                                                     firesignal(playButton.MouseButton1Down)
                                                     firesignal(playButton.MouseButton1Up)
                                                     firesignal(playButton.Activated)
-                                                    print("[DEBUG] Нажатие " .. i .. "/5 (все сигналы)")
                                                 else
-                                                    print("[DEBUG] Кнопка не является GuiButton, пробуем другие методы...")
+                                                    
                                                     firesignal(playButton.MouseButton1Click)
-                                                    print("[DEBUG] Нажатие " .. i .. "/5 (MouseButton1Click)")
                                                 end
                                             end)
                                             task.wait(0.1)
@@ -5359,33 +5227,30 @@ DebugTab:AddButton({
                                         found = true
                                         return
                                     else
-                                        print("[DEBUG] Кнопка Play не найдена в Main")
-                                        print("[DEBUG] Содержимое Main:")
+                                        
+                                        
                                         for _, child in pairs(main:GetChildren()) do
-                                            print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
                                         end
                                     end
                                 else
-                                    print("[DEBUG] Main не найден в Frames")
-                                    print("[DEBUG] Содержимое Frames:")
+                                    
+                                    
                                     for _, child in pairs(frames:GetChildren()) do
-                                        print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
                                     end
                                 end
                             else
-                                print("[DEBUG] Frames не найден в LoadingScreen")
-                                print("[DEBUG] Содержимое LoadingScreen:")
+                                
+                                
                                 for _, child in pairs(loadingScreen:GetChildren()) do
-                                    print("[DEBUG]   - " .. child.Name .. " (" .. child.ClassName .. ")")
                                 end
                             end
                             
                             -- Альтернативный метод: удаляем экран
                             if not found then
-                                print("[DEBUG] Попытка удалить LoadingScreen принудительно")
+                                
                                 pcall(function()
                                     loadingScreen:Destroy()
-                                    print("[DEBUG] LoadingScreen удален!")
+                                    
                                     Library:Notify({
                                         Title = "Тест: Альтернатива",
                                         Content = "LoadingScreen удален принудительно",
@@ -5396,10 +5261,9 @@ DebugTab:AddButton({
                             end
                             return
                         else
-                            print("[DEBUG] LoadingScreen не найден (возможно уже убран)")
                         end
                     else
-                        print("[DEBUG] PlayerGui не найден")
+                        
                     end
                 end)
                 
@@ -5408,14 +5272,14 @@ DebugTab:AddButton({
             end
             
             if not found then
-                print("[DEBUG] === Тест завершен: LoadingScreen не найден ===")
+                
                 Library:Notify({
                     Title = "Тест: Не найдено",
                     Content = "LoadingScreen отсутствует (уже убран или не появился)",
                     Duration = 3
                 })
             else
-                print("[DEBUG] === Тест завершен успешно ===")
+                
             end
         end)
     end
@@ -5432,13 +5296,6 @@ DebugTab:AddButton({
             Content = status,
             Duration = 3
         })
-        
-        print("[DEBUG] Обработчик команд: " .. status)
-        print("[DEBUG] Автофарм: " .. (isAutofarmEnabled and "Активен" or "Неактивен"))
-        print("[DEBUG] Автопродажа: " .. (isAutosellEnabled and "Активна" or "Неактивна"))
-        print("[DEBUG] Собрано предметов: " .. farmStats.itemsCollected)
-        print("[DEBUG] Продано предметов: " .. farmStats.itemsSold)
-        
         if not commandHandlerEnabled then
             Library:Notify({
                 Title = "ВНИМАНИЕ!",
@@ -5519,9 +5376,6 @@ DebugTab:AddButton({
                 current_account = game.Players.LocalPlayer.Name
             }
             
-            print("[DEBUG] Отправка статистики на http://localhost:5000/api/stats")
-            print("[DEBUG] Данные: " .. game:GetService("HttpService"):JSONEncode(statsData))
-            
             local HttpService = game:GetService("HttpService")
             local response = request({
                 Url = "http://localhost:5000/api/stats",
@@ -5530,8 +5384,8 @@ DebugTab:AddButton({
                 Body = HttpService:JSONEncode(statsData)
             })
             
-            print("[DEBUG] Ответ сервера: " .. response.StatusCode)
-            print("[DEBUG] Тело ответа: " .. response.Body)
+            
+            
             
             Library:Notify({
                 Title = "Статистика отправлена",
@@ -5541,7 +5395,6 @@ DebugTab:AddButton({
         end)
         
         if not success then
-            print("[DEBUG] ОШИБКА отправки статистики: " .. tostring(err))
             Library:Notify({
                 Title = "ОШИБКА!",
                 Content = tostring(err),
@@ -5555,23 +5408,11 @@ DebugTab:AddButton({
     Title = "Тест: Проверка _G переменных",
     Description = "Показывает сохраненные настройки для автозапуска",
     Callback = function()
-        print("[DEBUG] === Проверка _G переменных ===")
-        print("[DEBUG] _G.YBAEnhancedLoaded: " .. tostring(_G.YBAEnhancedLoaded))
-        print("[DEBUG] _G.YBAAutoRestart: " .. tostring(_G.YBAAutoRestart))
-        print("[DEBUG] _G.YBAAutoFarmEnabled: " .. tostring(_G.YBAAutoFarmEnabled))
-        print("[DEBUG] _G.YBAAutoSellEnabled: " .. tostring(_G.YBAAutoSellEnabled))
-        print("[DEBUG] _G.YBAAutoServerHop: " .. tostring(_G.YBAAutoServerHop))
         
         if _G.YBAFarmItems then
-            print("[DEBUG] _G.YBAFarmItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBAFarmItems))
+            -- Farm items loaded
         else
-            print("[DEBUG] _G.YBAFarmItems: nil")
-        end
-        
-        if _G.YBASellItems then
-            print("[DEBUG] _G.YBASellItems: " .. game:GetService("HttpService"):JSONEncode(_G.YBASellItems))
-        else
-            print("[DEBUG] _G.YBASellItems: nil")
+            
         end
         
         local content = "Loaded: " .. tostring(_G.YBAEnhancedLoaded) .. "\n"
@@ -5585,7 +5426,7 @@ DebugTab:AddButton({
             Duration = 5
         })
         
-        print("[DEBUG] === Проверка завершена ===")
+        
     end
 })
 
@@ -5599,7 +5440,7 @@ DebugTab:AddButton({
             Duration = 3
         })
         
-        print("[DEBUG] === Симуляция автозапуска ===")
+        
         
         -- Сохраняем текущие настройки в _G
         _G.YBAAutoRestart = true
@@ -5608,11 +5449,6 @@ DebugTab:AddButton({
         _G.YBAFarmItems = Settings.FarmItems
         _G.YBASellItems = Settings.SellItems
         _G.YBAAutoServerHop = Settings.AutoServerHop
-        
-        print("[DEBUG] Настройки сохранены в _G")
-        print("[DEBUG] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-        print("[DEBUG] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
-        print("[DEBUG] AutoServerHop: " .. tostring(_G.YBAAutoServerHop))
         
         Library:Notify({
             Title = "Тест: Сохранено",
@@ -5624,7 +5460,7 @@ DebugTab:AddButton({
         
         -- Симулируем автозапуск
         if _G.YBAAutoRestart then
-            print("[DEBUG] Обнаружен флаг автозапуска!")
+            
             
             Library:Notify({
                 Title = "Тест: Автозапуск",
@@ -5633,11 +5469,11 @@ DebugTab:AddButton({
             })
             
             if _G.YBAFarmItems then
-                print("[DEBUG] Восстановление FarmItems")
+                
                 Settings.FarmItems = _G.YBAFarmItems
             end
             if _G.YBASellItems then
-                print("[DEBUG] Восстановление SellItems")
+                
                 Settings.SellItems = _G.YBASellItems
             end
             if _G.YBAAutoServerHop ~= nil then
@@ -5648,11 +5484,11 @@ DebugTab:AddButton({
             
             if Options.FarmItems and Settings.FarmItems then
                 Options.FarmItems:SetValue(Settings.FarmItems)
-                print("[DEBUG] FarmItems установлены в UI")
+                
             end
             if Options.SellItems and Settings.SellItems then
                 Options.SellItems:SetValue(Settings.SellItems)
-                print("[DEBUG] SellItems установлены в UI")
+                
             end
             
             Library:Notify({
@@ -5661,7 +5497,7 @@ DebugTab:AddButton({
                 Duration = 5
             })
             
-            print("[DEBUG] === Симуляция завершена успешно ===")
+            
         end
     end
 })
@@ -5670,8 +5506,8 @@ DebugTab:AddButton({
     Title = "Очистить консоль",
     Description = "Очищает вывод в консоль",
     Callback = function()
-        print("\n\n\n\n\n\n\n\n\n\n")
-        print("[DEBUG] Консоль очищена")
+        
+        
         Library:Notify({
             Title = "Debug",
             Content = "Консоль очищена",
@@ -5712,7 +5548,7 @@ else
 end
 
 -- Update player list periodically
-globalConnections.playerListUpdate = spawn(function()
+globalConnections.playerListUpdate = task.spawn(function()
     while not ScriptDestroyed do
         wait(5)
         if PlayerDropdown then
@@ -5778,12 +5614,12 @@ end
 
 -- АВТОЗАГРУЗКА: Используй yba_autoloader.lua в workspace папке Solara
 -- queue_on_teleport НЕ РАБОТАЕТ в Solara, поэтому используем autoloader
-print("[YBA Enhanced] Для автозагрузки после server hop используй yba_autoloader.lua в workspace")
+
 
 -- Но сохраняем настройки перед телепортом в _G переменные
 game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(State)
     if State == Enum.TeleportState.Started then
-        print("[YBA Enhanced] Телепортация началась - сохранение настроек...")
+        
         
         _G.YBAAutoRestart = true
         _G.YBAAutoFarmEnabled = Settings.Autofarm
@@ -5791,33 +5627,29 @@ game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(State)
         _G.YBAFarmItems = Settings.FarmItems
         _G.YBASellItems = Settings.SellItems
         _G.YBAAutoServerHop = Settings.AutoServerHop
-        
-        print("[YBA Enhanced] Настройки сохранены в _G переменные")
-        print("[YBA Enhanced] Autofarm: " .. tostring(_G.YBAAutoFarmEnabled))
-        print("[YBA Enhanced] Autosell: " .. tostring(_G.YBAAutoSellEnabled))
     end
 end)
 
 -- УДАЛЕНО: Автозапуск теперь происходит ПОСЛЕ нажатия кнопки Play (см. выше)
 
 -- Apply startup settings after a small delay to ensure everything is loaded
-globalConnections.startupSettings = spawn(function()
+globalConnections.startupSettings = task.spawn(function()
     wait(2)  -- Увеличена задержка для полной загрузки UI
     if ScriptDestroyed then return end
     
-    print("[YBA Enhanced] === Автозапуск настроек (НЕ АВТОФАРМ) ===")
+
     
-    if Settings.Fly then StartFly() print("[YBA Enhanced] Fly запущен") end
-    if Settings.NoClip then StartNoClip() print("[YBA Enhanced] NoClip запущен") end
-    if Settings.Speed then StartSpeed() print("[YBA Enhanced] Speed запущен") end
-    if Settings.InfiniteJump then StartInfiniteJump() print("[YBA Enhanced] InfiniteJump запущен") end
-    if Settings.JumpHack then StartJumpHack() print("[YBA Enhanced] JumpHack запущен") end
-    if Settings.StandControl then StartStandControl() print("[YBA Enhanced] StandControl запущен") end
-    if Settings.Platform then CreateFarmPlatform() print("[YBA Enhanced] Platform создана") end
+    if Settings.Fly then StartFly()  end
+    if Settings.NoClip then StartNoClip()  end
+    if Settings.Speed then StartSpeed()  end
+    if Settings.InfiniteJump then StartInfiniteJump()  end
+    if Settings.JumpHack then StartJumpHack()  end
+    if Settings.StandControl then StartStandControl()  end
+    if Settings.Platform then CreateFarmPlatform()  end
     
     -- КРИТИЧНО: Восстанавливаем ESP если он был включен
     if ESPSettings.Enabled and DrawingSupported then
-        print("[YBA Enhanced] Восстановление ESP...")
+        
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
                 CreateESP(player)
@@ -5830,16 +5662,14 @@ globalConnections.startupSettings = spawn(function()
         })
     end
     
-    -- ВАЖНО: Автофарм и автопродажа запускаются ПОСЛЕ нажатия кнопки Play!
-    print("[YBA Enhanced] === Автозапуск завершен (автофарм запустится после Play) ===")
 end)
 
 -- КРИТИЧНО: ВСЕГДА запускаем обработчик команд (даже после server hop)
-globalConnections.commandHandlerAutostart = spawn(function()
+globalConnections.commandHandlerAutostart = task.spawn(function()
     wait(2)  -- Ждем загрузки UI
     if ScriptDestroyed then return end
     
-    print("[YBA Enhanced] Автозапуск обработчика команд...")
+    
     StartCommandHandler()
     
     Library:Notify({
@@ -5879,3 +5709,7 @@ else
         Duration = 5
     })
 end
+
+
+
+
