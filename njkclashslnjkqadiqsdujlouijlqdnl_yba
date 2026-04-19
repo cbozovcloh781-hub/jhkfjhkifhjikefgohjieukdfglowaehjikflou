@@ -2574,6 +2574,33 @@ local function StartAutosell()
                             Duration = 5
                         })
                         
+                        -- КРИТИЧНО: Отправляем уведомление в Telegram
+                        print("[Autosell] Баланс достиг $1,000,000! Отправка уведомления в Telegram...")
+                        pcall(function()
+                            local HttpService = game:GetService("HttpService")
+                            local notificationData = {
+                                action = "balance_limit_reached",
+                                balance = currentMoney,
+                                account = game.Players.LocalPlayer.Name,
+                                server_id = game.JobId,
+                                place_id = game.PlaceId,
+                                timestamp = os.time()
+                            }
+                            
+                            local response = request({
+                                Url = "http://localhost:5000/api/balance_alert",
+                                Method = "POST",
+                                Headers = {["Content-Type"] = "application/json"},
+                                Body = HttpService:JSONEncode(notificationData)
+                            })
+                            
+                            if response and response.StatusCode == 200 then
+                                print("[Autosell] Уведомление отправлено успешно!")
+                            else
+                                print("[Autosell] ОШИБКА отправки уведомления: код " .. (response and response.StatusCode or "nil"))
+                            end
+                        end)
+                        
                         -- Stop autosell
                         isAutosellEnabled = false
                         Settings.Autosell = false
