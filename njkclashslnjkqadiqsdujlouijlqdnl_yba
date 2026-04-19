@@ -2005,21 +2005,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- БЕЗОПАСНАЯ СКОРОСТЬ (сбалансированная для избежания откатов)
+    -- СБАЛАНСИРОВАННАЯ СКОРОСТЬ (быстрее но безопасно)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 22
-        stepDelay = 0.042
-    elseif distance < 300 then
-        stepSize = 24
-        stepDelay = 0.040
-    elseif distance < 600 then
-        stepSize = 26
+        stepSize = 25
         stepDelay = 0.038
-    else
-        stepSize = 28
+    elseif distance < 300 then
+        stepSize = 27
         stepDelay = 0.036
+    elseif distance < 600 then
+        stepSize = 29
+        stepDelay = 0.034
+    else
+        stepSize = 31
+        stepDelay = 0.032
     end
     
     local direction = (targetPos - startPos).Unit
@@ -2175,6 +2175,13 @@ end
 
 local function StartAutofarm()
     if isAutofarmEnabled then return end
+    
+    -- КРИТИЧНО: Очищаем старые соединения ПЕРЕД запуском
+    for _, connection in pairs(autofarmConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    autofarmConnections = {}
+    
     isAutofarmEnabled = true
     
     -- КРИТИЧНО: Обновляем _G переменные при запуске автофарма
