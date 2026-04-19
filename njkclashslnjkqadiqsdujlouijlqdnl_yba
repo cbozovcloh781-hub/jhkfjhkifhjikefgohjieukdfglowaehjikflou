@@ -439,6 +439,17 @@ task.spawn(function()
             print("[YBA Enhanced] Автозапуск автопродажи...")
             task.wait(1)
             
+            -- КРИТИЧНО: ПРИНУДИТЕЛЬНО загружаем конфиг с сервера ПЕРЕД запуском
+            print("[YBA Enhanced] Принудительная загрузка конфига перед автоселлом...")
+            local configLoaded = LoadConfigFromServer()
+            if configLoaded then
+                print("[YBA Enhanced] Конфиг загружен успешно!")
+                print("[YBA Enhanced] Settings.Autosell: " .. tostring(Settings.Autosell))
+                print("[YBA Enhanced] Settings.SellItems: " .. game:GetService("HttpService"):JSONEncode(Settings.SellItems or {}))
+            else
+                print("[YBA Enhanced] ОШИБКА: Конфиг не загрузился! Используем локальные настройки.")
+            end
+            
             -- КРИТИЧНО: Сначала обновляем Settings
             Settings.Autosell = true
             print("[YBA Enhanced] Settings.Autosell = true")
