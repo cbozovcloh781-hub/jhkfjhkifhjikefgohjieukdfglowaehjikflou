@@ -2173,7 +2173,7 @@ local function StartAutofarm()
                     prompt.Style = Enum.ProximityPromptStyle.Default
                     prompt.UIOffset = Vector2.new(0, 0)
                     
-                    local targetPos = item.Position + Vector3.new(0, -10, 0)  -- ИЗМЕНЕНО: -8 -> -10 (еще на 2 ниже)
+                    local targetPos = item.Position + Vector3.new(0, -9, 0)  -- ИЗМЕНЕНО: -8 -> -10 (еще на 2 ниже)
                     
                     -- БЫСТРАЯ телепортация к предмету
                     bypassTeleport(targetPos)
@@ -2252,6 +2252,9 @@ local function StartAutofarm()
                             itemPickedUp = true
                             break
                         end
+                    
+                    -- �����: ��������� �������� ����� ���� ������� �������
+                    task.wait(0.1)
                     end
                     
                     -- ВОЗВРАЩАЕМ КАМЕРУ ОБРАТНО (КРИТИЧНО!)
@@ -2794,28 +2797,36 @@ local function ExecuteCommand(command, args)
     
     
     if command == "toggle_autofarm" then
-        -- ИСПРАВЛЕНО: Всегда ВКЛЮЧАЕМ автофарм (не переключаем)
         if not isAutofarmEnabled then
             Settings.Autofarm = true
             if Options and Options.Autofarm then
                 Options.Autofarm:SetValue(true)
             end
             StartAutofarm()
-            return {success = true, message = "Автофарм запущен"}
+            return {success = true, message = "�������� �������"}
         else
-            return {success = true, message = "Автофарм уже работает"}
+            Settings.Autofarm = false
+            if Options and Options.Autofarm then
+                Options.Autofarm:SetValue(false)
+            end
+            StopAutofarm()
+            return {success = true, message = "�������� ��������"}
         end
     elseif command == "toggle_autosell" then
-        -- ИСПРАВЛЕНО: Всегда ВКЛЮЧАЕМ автопродажу (не переключаем)
         if not isAutosellEnabled then
             Settings.Autosell = true
             if Options and Options.Autosell then
                 Options.Autosell:SetValue(true)
             end
             StartAutosell()
-            return {success = true, message = "Автопродажа запущена"}
+            return {success = true, message = "����������� ��������"}
         else
-            return {success = true, message = "Автопродажа уже работает"}
+            Settings.Autosell = false
+            if Options and Options.Autosell then
+                Options.Autosell:SetValue(false)
+            end
+            StopAutosell()
+            return {success = true, message = "����������� ���������"}
         end
     elseif command == "drop_money" then
         local money = GetPlayerMoney()
@@ -3008,7 +3019,7 @@ local function StartCommandHandler()
                     local data = HttpService:JSONDecode(response.Body)
                     
                     if data.command then
-                        local cmdResult = HandleCommand(data.command)
+                        local cmdResult = ExecuteCommand(data.command)
                         
                     end
                 end
@@ -4702,7 +4713,7 @@ DebugTab:AddButton({
         local prompt, item = FindNearestItem()
         if prompt and item then
             local itemName = prompt.ObjectText or "Unknown"
-            local targetPos = item.Position + Vector3.new(0, -10, 0)  -- ИЗМЕНЕНО: -8 -> -10 (еще на 2 ниже)
+            local targetPos = item.Position + Vector3.new(0, -9, 0)  -- ИЗМЕНЕНО: -8 -> -10 (еще на 2 ниже)
             local character = Player.Character
             local rootPart = character.HumanoidRootPart
             
