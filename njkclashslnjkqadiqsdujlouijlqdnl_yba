@@ -488,14 +488,12 @@ task.spawn(function()
         end
         
         -- КРИТИЧНО: Проверяем сохраненные настройки из файла
-        if Settings.Autofarm then
+        if Settings.Autofarm and Options and Options.Autofarm then
             task.wait(1)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
-            if Options.Autofarm then
-                Options.Autofarm:SetValue(true)
+            Options.Autofarm:SetValue(true)
                 
-            end
             
             -- КРИТИЧНО: Проверяем что FarmItems не пустой
             if Settings.FarmItems and next(Settings.FarmItems) then
@@ -509,14 +507,12 @@ task.spawn(function()
         end
         
         -- Если автопродажа была включена - запускаем
-        if Settings.Autosell then
+        if Settings.Autosell and Options and Options.Autosell then
             task.wait(0.5)
             
             -- КРИТИЧНО: Обновляем тумблер в UI
-            if Options.Autosell then
-                Options.Autosell:SetValue(true)
+            Options.Autosell:SetValue(true)
                 
-            end
             
             -- КРИТИЧНО: Проверяем что SellItems не пустой
             if Settings.SellItems and next(Settings.SellItems) then
@@ -3719,7 +3715,18 @@ MovementTab:AddSlider("JumpHeight", {
 
 -- ESP Tab
 local ESPTab = Window:AddTab({Title = "ESP", Icon = "eye"})
-ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) if not DrawingSupported or not Drawing then Library:Notify({Title = "ESP", Content = "Drawing API не поддерживается в Solara", Duration = 5}) ESPSettings.Enabled = false _G.YBAESPEnabled = false return end ESPSettings.Enabled = Value _G.YBAESPEnabled = Value saveSettings() SaveConfigToServer() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
+
+-- КРИТИЧНО: Проверяем Drawing API ПРИ ЗАПУСКЕ
+if not DrawingSupported or not Drawing then
+    ESPTab:AddParagraph({
+        Title = "⚠️ ESP недоступен",
+        Content = "Drawing API не поддерживается в Solara. Используйте Chams и Show Cheaters вместо этого."
+    })
+    ESPSettings.Enabled = false
+    _G.YBAESPEnabled = false
+else
+    ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enabled, Callback = function(Value) ESPSettings.Enabled = Value _G.YBAESPEnabled = Value saveSettings() SaveConfigToServer() if not Value then CleanupESP() else for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then CreateESP(player) end end end end})
+end
 
 -- НОВОЕ: Просмотр читеров (без автосвапа)
 local cheaterViewEnabled = false
@@ -3751,14 +3758,23 @@ local function UpdatePlayerlistCheaterTags()
                                     local playerName = playerNameLabel.Text:gsub("%[CHEATER%] ", "") -- Убираем старую метку
                                     local targetPlayer = Players:FindFirstChild(playerName)
                                     
-                                    if targetPlayer and detectedCheaters[targetPlayer.UserId] then
+                                    -- ИСПРАВЛЕНО: Проверяем И detectedCheaters И cheaterTimers
+                                    local isCheater = false
+                                    if targetPlayer then
+                                        -- Читер если он в detectedCheaters ИЛИ в cheaterTimers (еще не истекло 60 секунд)
+                                        if detectedCheaters[targetPlayer.UserId] or cheaterTimers[targetPlayer.UserId] then
+                                            isCheater = true
+                                        end
+                                    end
+                                    
+                                    if isCheater then
                                         -- Помечаем читера
                                         if not playerNameLabel.Text:find("%[CHEATER%]") then
                                             playerNameLabel.Text = "[CHEATER] " .. playerName
                                             playerNameLabel.TextColor3 = Color3.fromRGB(255, 165, 0) -- Оранжевый
                                         end
                                     else
-                                        -- Убираем метку если игрок не читер
+                                        -- Убираем метку ТОЛЬКО если игрок точно не читер
                                         if playerNameLabel.Text:find("%[CHEATER%]") then
                                             playerNameLabel.Text = playerName
                                             playerNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Белый
@@ -3776,12 +3792,13 @@ local function UpdatePlayerlistCheaterTags()
     end)
 end
 
-ESPTab:AddToggle("CheaterView", {Title = "Show Cheaters", Default = Settings.CheaterViewEnabled or false, Callback = function(Value) cheaterViewEnabled = Value Settings.CheaterViewEnabled = Value saveSettings() SaveConfigToServer() if Value then UpdatePlayerlistCheaterTags() if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) end cheaterDetectionThread = task.spawn(function() while cheaterViewEnabled do local currentTime = tick() for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local distance = (currentPos - lastPos).Magnitude local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true end cheaterTimers[player.UserId] = currentTime end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end for userId, lastViolation in pairs(cheaterTimers) do if currentTime - lastViolation >= 60 then detectedCheaters[userId] = nil cheaterTimers[userId] = nil end end task.wait(0.5) end cheaterDetectionThread = nil end) else detectedCheaters = {} cheaterTimers = {} if cheaterViewThread then pcall(function() task.cancel(cheaterViewThread) end) cheaterViewThread = nil end if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) cheaterDetectionThread = nil end end end})
+ESPTab:AddToggle("CheaterView", {Title = "Show Cheaters", Default = Settings.CheaterViewEnabled or false, Callback = function(Value) cheaterViewEnabled = Value Settings.CheaterViewEnabled = Value saveSettings() SaveConfigToServer() if Value then pcall(function() local playerGui = game:GetService("Players").LocalPlayer.PlayerGui local hud = playerGui:FindFirstChild("HUD") if hud then local playerlist = hud:FindFirstChild("Playerlist") if playerlist then playerlist.Size = UDim2.new(playerlist.Size.X.Scale, playerlist.Size.X.Offset, 0.7, 0) end end end) UpdatePlayerlistCheaterTags() if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) end cheaterDetectionThread = task.spawn(function() while cheaterViewEnabled do local currentTime = tick() for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local distance = (currentPos - lastPos).Magnitude local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true end cheaterTimers[player.UserId] = currentTime end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end for userId, lastViolation in pairs(cheaterTimers) do if currentTime - lastViolation >= 60 then detectedCheaters[userId] = nil cheaterTimers[userId] = nil end end task.wait(0.5) end cheaterDetectionThread = nil end) else pcall(function() local playerGui = game:GetService("Players").LocalPlayer.PlayerGui local hud = playerGui:FindFirstChild("HUD") if hud then local playerlist = hud:FindFirstChild("Playerlist") if playerlist then playerlist.Size = UDim2.new(playerlist.Size.X.Scale, playerlist.Size.X.Offset, playerlist.Size.Y.Scale, playerlist.Size.Y.Offset) end end end) detectedCheaters = {} cheaterTimers = {} if cheaterViewThread then pcall(function() task.cancel(cheaterViewThread) end) cheaterViewThread = nil end if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) cheaterDetectionThread = nil end end end})
 
 -- КРИТИЧНО: Автозапуск CheaterView при загрузке скрипта
 if Settings.CheaterViewEnabled and cheaterViewEnabled then
     task.spawn(function()
         task.wait(1)
+        pcall(function() local playerGui = game:GetService("Players").LocalPlayer.PlayerGui local hud = playerGui:FindFirstChild("HUD") if hud then local playerlist = hud:FindFirstChild("Playerlist") if playerlist then playerlist.Size = UDim2.new(playerlist.Size.X.Scale, playerlist.Size.X.Offset, 0.7, 0) end end end)
         UpdatePlayerlistCheaterTags()
         if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) end
         cheaterDetectionThread = task.spawn(function()
@@ -4653,6 +4670,12 @@ local function StopConsole()
     end)
 end
 
+-- Debug Tab (СОЗДАЕМ ПЕРЕД Settings)
+local DebugTab = Window:AddTab({
+    Title = "Debug",
+    Icon = "bug"
+})
+
 -- Settings Tab
 local SettingsTab = Window:AddTab({
     Title = "Settings",
@@ -4708,31 +4731,6 @@ SettingsTab:AddButton({
         pcall(function()
             DestroyAllFunctions()
         end)
-    end
-})
-
-
-
-DebugTab:AddButton({
-    Title = "Тест: Найти ближайший предмет",
-    Callback = function()
-        local prompt, item = FindNearestItem()
-        if prompt and item then
-            local itemName = prompt.ObjectText or "Unknown"
-            local distance = (item.Position - Player.Character.HumanoidRootPart.Position).Magnitude
-            Library:Notify({
-                Title = "Тест: Предмет найден",
-                Content = itemName .. " на расстоянии " .. math.floor(distance) .. " стадов",
-                Duration = 5
-            })
- else
-            Library:Notify({
-                Title = "Тест: Предмет не найден",
-                Content = "Нет предметов для фарма поблизости",
-                Duration = 3
-            })
-            
-        end
     end
 })
 
