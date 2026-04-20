@@ -3569,7 +3569,6 @@ local MovementTab = Window:AddTab({
 
 MovementTab:AddToggle("Fly", {
     Title = "Fly",
-    Description = "Fly around the map",
     Default = Settings.Fly,
     Callback = function(Value)
         Settings.Fly = Value
@@ -3586,7 +3585,6 @@ MovementTab:AddToggle("Fly", {
 
 MovementTab:AddSlider("FlySpeed", {
     Title = "Fly Speed",
-    Description = "Adjust fly speed",
     Default = Settings.FlySpeed,
     Min = 1,
     Max = 200,
@@ -3600,7 +3598,6 @@ MovementTab:AddSlider("FlySpeed", {
 
 MovementTab:AddToggle("NoClip", {
     Title = "NoClip",
-    Description = "Walk through walls",
     Default = Settings.NoClip,
     Callback = function(Value)
         Settings.NoClip = Value
@@ -3617,7 +3614,6 @@ MovementTab:AddToggle("NoClip", {
 
 MovementTab:AddToggle("Speed", {
     Title = "Speed Hack",
-    Description = "Increase walk speed",
     Default = Settings.Speed,
     Callback = function(Value)
         Settings.Speed = Value
@@ -3634,7 +3630,6 @@ MovementTab:AddToggle("Speed", {
 
 MovementTab:AddSlider("SpeedValue", {
     Title = "Speed Value",
-    Description = "Adjust walk speed",
     Default = Settings.SpeedValue,
     Min = 16,
     Max = 200,
@@ -3658,7 +3653,6 @@ MovementTab:AddSlider("SpeedValue", {
 
 MovementTab:AddToggle("InfiniteJump", {
     Title = "Infinite Jump",
-    Description = "Jump infinitely",
     Default = Settings.InfiniteJump,
     Callback = function(Value)
         Settings.InfiniteJump = Value
@@ -3675,7 +3669,6 @@ MovementTab:AddToggle("InfiniteJump", {
 
 MovementTab:AddToggle("JumpHack", {
     Title = "Jump Hack",
-    Description = "Modify jump height",
     Default = Settings.JumpHack,
     Callback = function(Value)
         Settings.JumpHack = Value
@@ -3692,7 +3685,6 @@ MovementTab:AddToggle("JumpHack", {
 
 MovementTab:AddSlider("JumpHeight", {
     Title = "Jump Height",
-    Description = "Adjust jump height",
     Default = Settings.JumpHeight,
     Min = 10,
     Max = 200,
@@ -3720,6 +3712,7 @@ ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enab
 
 -- НОВОЕ: Просмотр читеров (без автосвапа)
 local cheaterViewEnabled = false
+local cheaterTimers = {}  -- {userId = lastViolationTime}
 
 -- НОВОЕ: Функция для маркировки читеров в табе игроков
 local function UpdatePlayerlistCheaterTags()
@@ -3764,7 +3757,7 @@ local function UpdatePlayerlistCheaterTags()
     end)
 end
 
-ESPTab:AddToggle("CheaterView", {Title = "👁️ Просмотр читеров", Description = "Выделяет читеров оранжевым (без автосвапа)", Default = false, Callback = function(Value) cheaterViewEnabled = Value if Value then Library:Notify({Title = "Просмотр читеров", Content = "Читеры будут выделены оранжевым", Duration = 3}) UpdatePlayerlistCheaterTags() task.spawn(function() while cheaterViewEnabled do for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local currentTime = tick() local distance = (currentPos - lastPos).Magnitude local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true Library:Notify({Title = "Читер обнаружен!", Content = player.Name .. " использует телепорт (скорость: " .. math.floor(speed) .. " studs/s)", Duration = 5}) end end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end task.wait(0.5) end end) else detectedCheaters = {} Library:Notify({Title = "Просмотр читеров", Content = "Просмотр читеров отключен", Duration = 3}) end end})
+ESPTab:AddToggle("CheaterView", {Title = "Просмотр читеров", Default = Settings.CheaterViewEnabled or false, Callback = function(Value) cheaterViewEnabled = Value Settings.CheaterViewEnabled = Value saveSettings() SaveConfigToServer() if Value then UpdatePlayerlistCheaterTags() task.spawn(function() while cheaterViewEnabled do local currentTime = tick() for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local distance = (currentPos - lastPos).Magnitude local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true end cheaterTimers[player.UserId] = currentTime end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end for userId, lastViolation in pairs(cheaterTimers) do if currentTime - lastViolation >= 60 then detectedCheaters[userId] = nil cheaterTimers[userId] = nil end end task.wait(0.5) end end) else detectedCheaters = {} cheaterTimers = {} end end})
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() SaveConfigToServer() end})
@@ -3787,8 +3780,7 @@ local AutoTab = Window:AddTab({Title = "Autofarm", Icon = "cpu"})
 
 -- === АВТОФАРМ ===
 Options.Autofarm = AutoTab:AddToggle("Autofarm", {
-    Title = "🎯 Auto Farm Items",
-    Description = "Автоматически собирает выбранные предметы",
+    Title = "Auto Farm Items",
     Default = Settings.Autofarm,
     Callback = function(Value)
         Settings.Autofarm = Value
@@ -3810,8 +3802,7 @@ Options.Autofarm = AutoTab:AddToggle("Autofarm", {
 local isSettingDropdownProgrammatically = false
 
 Options.FarmItems = AutoTab:AddDropdown("FarmItems", {
-    Title = "📦 Предметы для сбора",
-    Description = "Выбери какие предметы собирать",
+    Title = "Предметы для сбора",
     Values = farmItemsList,
     Multi = true,
     Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
@@ -3835,8 +3826,7 @@ else
 end
 
 Options.Autosell = AutoTab:AddToggle("Autosell", {
-    Title = "💰 Auto Sell Items",
-    Description = "Автоматически продает выбранные предметы (лимит $1M)",
+    Title = "Auto Sell Items",
     Default = Settings.Autosell,
     Callback = function(Value)
         Settings.Autosell = Value
@@ -3855,8 +3845,7 @@ Options.Autosell = AutoTab:AddToggle("Autosell", {
 })
 
 Options.SellItems = AutoTab:AddDropdown("SellItems", {
-    Title = "💸 Предметы для продажи",
-    Description = "Выбери какие предметы продавать",
+    Title = "Предметы для продажи",
     Values = sellItemsList,
     Multi = true,
     Default = {},  -- КРИТИЧНО: Пустой Default, установим вручную
@@ -3945,8 +3934,7 @@ end
 
 -- === СТАТИСТИКА ===
 AutoTab:AddButton({
-    Title = "📊 Показать статистику фарма",
-    Description = "Детальная статистика собранных/проданных предметов",
+    Title = "Показать статистику фарма",
     Callback = function()
         local uptime = math.floor(tick() - farmStats.startTime)
         local days = math.floor(uptime / 86400)
@@ -3997,8 +3985,7 @@ AutoTab:AddButton({
 
 -- === ПОКУПКА LUCKY ARROW ===
 Options.AutobuyLuckyArrow = AutoTab:AddToggle("AutobuyLuckyArrow", {
-    Title = "🎯 Auto Buy Lucky Arrow (Loop)",
-    Description = "Автоматически покупает Lucky Arrow за $50,000 (бесконечно)",
+    Title = "Auto Buy Lucky Arrow (Loop)",
     Default = Settings.AutobuyLuckyArrow,
     Callback = function(Value)
         Settings.AutobuyLuckyArrow = Value
@@ -4014,8 +4001,7 @@ Options.AutobuyLuckyArrow = AutoTab:AddToggle("AutobuyLuckyArrow", {
 })
 
 AutoTab:AddButton({
-    Title = "🎯 Купить 1x Lucky Arrow",
-    Description = "Купить ОДНУ Lucky Arrow за $50,000 (разовая покупка)",
+    Title = "Купить 1x Lucky Arrow",
     Callback = function()
         local money = GetPlayerMoney()
         if money < 50000 then
@@ -4046,8 +4032,7 @@ AutoTab:AddButton({
 
 -- === ЗАЩИТА ОТ ЧИТЕРОВ ===
 Options.AutoServerHop = AutoTab:AddToggle("AutoServerHop", {
-    Title = "🛡️ Auto Server Hop",
-    Description = "Автоматически меняет сервер при обнаружении 3 читеров",
+    Title = "Auto Server Hop",
     Default = Settings.AutoServerHop,
     Callback = function(Value)
         Settings.AutoServerHop = Value
@@ -4067,7 +4052,6 @@ Options.AutoServerHop = AutoTab:AddToggle("AutoServerHop", {
 
 AutoTab:AddSlider("CheaterDetectionSensitivity", {
     Title = "Чувствительность детектора",
-    Description = "Сколько раз нужно засечь читера для подтверждения",
     Default = Settings.CheaterDetectionSensitivity,
     Min = 1,
     Max = 10,
@@ -4080,8 +4064,7 @@ AutoTab:AddSlider("CheaterDetectionSensitivity", {
 })
 
 AutoTab:AddButton({
-    Title = "🔄 Сменить сервер вручную",
-    Description = "Принудительно сменить сервер (с сохранением настроек)",
+    Title = "Сменить сервер вручную",
     Callback = function()
         ServerHop()
     end
@@ -4096,7 +4079,6 @@ local TeleportTab = Window:AddTab({
 -- === МОНИТОРИНГ БАЛАНСА ===
 Options.MoneyFarmEnabled = AutoTab:AddToggle("MoneyFarmEnabled", {
     Title = "Мониторинг баланса",
-    Description = "Отслеживает количество денег на аккаунте",
     Default = Settings.MoneyFarmEnabled,
     Callback = function(Value)
         Settings.MoneyFarmEnabled = Value
@@ -4113,7 +4095,6 @@ Options.MoneyFarmEnabled = AutoTab:AddToggle("MoneyFarmEnabled", {
 
 Options.AutoDropMoney = AutoTab:AddToggle("AutoDropMoney", {
     Title = "Режим продажи",
-    Description = "Включить когда нужно передать деньги покупателю",
     Default = Settings.AutoDropMoney,
     Callback = function(Value)
         Settings.AutoDropMoney = Value
@@ -4132,7 +4113,6 @@ Options.AutoDropMoney = AutoTab:AddToggle("AutoDropMoney", {
 
 AutoTab:AddInput("ReceiverUsername", {
     Title = "Ник получателя",
-    Description = "Username игрока который будет получать деньги",
     Default = Settings.ReceiverUsername,
     Placeholder = "Введите ник...",
     Callback = function(Value)
@@ -4144,7 +4124,6 @@ AutoTab:AddInput("ReceiverUsername", {
 
 AutoTab:AddButton({
     Title = "Дропнуть все деньги",
-    Description = "Вручную дропнуть все деньги на землю",
     Callback = function()
         local money = GetPlayerMoney()
         if money > 0 then
@@ -4174,7 +4153,6 @@ AutoTab:AddButton({
 
 AutoTab:AddButton({
     Title = "Тест: Отправить уведомление",
-    Description = "Проверяет связь с локальным сервером (localhost:5000)",
     Callback = function()
         local money = GetPlayerMoney()
         local success = SendMoneyNotification(money, Settings.ReceiverUsername)
@@ -4197,7 +4175,6 @@ AutoTab:AddButton({
 
 AutoTab:AddButton({
     Title = "Показать текущий баланс",
-    Description = "Выводит количество денег в консоль и уведомление",
     Callback = function()
         local money = GetPlayerMoney()
         currentMoney = money
@@ -4214,7 +4191,6 @@ AutoTab:AddButton({
 
 local PlayerDropdown = TeleportTab:AddDropdown("PlayerSelect", {
     Title = "Select Player",
-    Description = "Choose player to teleport to",
     Values = GetAlivePlayers(),
     Multi = false,
     Default = Settings.SelectedPlayer,
@@ -4226,7 +4202,6 @@ local PlayerDropdown = TeleportTab:AddDropdown("PlayerSelect", {
 
 TeleportTab:AddButton({
     Title = "Teleport to Player",
-    Description = "Teleport to selected player",
     Callback = function()
         if Settings.SelectedPlayer then
             if TeleportToPlayer(Settings.SelectedPlayer) then
@@ -4712,7 +4687,6 @@ local SettingsTab = Window:AddTab({
 
 SettingsTab:AddToggle("UnlockZoom", {
     Title = "Unlock Zoom",
-    Description = "Remove camera zoom distance limit",
     Default = Settings.UnlockZoom,
     Callback = function(Value)
         Settings.UnlockZoom = Value
@@ -4731,7 +4705,6 @@ SettingsTab:AddToggle("UnlockZoom", {
 
 SettingsTab:AddToggle("CustomConsole", {
     Title = "Custom Console",
-    Description = "Enable custom debug console (auto-opens on script start)",
     Default = Settings.CustomConsole or false,
     Callback = function(Value)
         Settings.CustomConsole = Value
@@ -4757,7 +4730,6 @@ end
 
 SettingsTab:AddButton({
     Title = "Destroy Script",
-    Description = "Completely remove the script",
     Callback = function()
         pcall(function()
             DestroyAllFunctions()
@@ -4773,7 +4745,6 @@ local DebugTab = Window:AddTab({
 
 DebugTab:AddButton({
     Title = "Тест: Найти ближайший предмет",
-    Description = "Проверяет поиск ближайшего предмета",
     Callback = function()
         local prompt, item = FindNearestItem()
         if prompt and item then
@@ -4797,7 +4768,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Телепорт к предмету",
-    Description = "Телепортируется к ближайшему предмету",
     Callback = function()
         local prompt, item = FindNearestItem()
         if prompt and item then
@@ -4832,7 +4802,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Активация промпта",
-    Description = "Пытается подобрать ближайший предмет",
     Callback = function()
         local prompt, item = FindNearestItem()
         if prompt and item then
@@ -4946,7 +4915,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Телепорт на платформу",
-    Description = "Проверяет телепорт на фарм платформу",
     Callback = function()
         local startTime = tick()
         TeleportToPlatform()
@@ -4963,7 +4931,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Проверка застревания",
-    Description = "Проверяет систему обнаружения застревания",
     Callback = function()
         local stuck = isPlayerStuck()
         Library:Notify({
@@ -4976,7 +4943,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Показать выбранные предметы",
-    Description = "Выводит список выбранных предметов для фарма",
     Callback = function()
         local selectedItems = Options.FarmItems and Options.FarmItems.Value or Settings.FarmItems
         
@@ -5011,7 +4977,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Показать статистику фарма",
-    Description = "Показывает актуальную статистику собранных/проданных предметов",
     Callback = function()
         local uptime = math.floor(tick() - farmStats.startTime)
         local days = math.floor(uptime / 86400)
@@ -5077,7 +5042,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Скорость телепорта",
-    Description = "Измеряет скорость телепорта на 1000 стадов",
     Callback = function()
         local character = Player.Character
         if not character or not character:FindFirstChild("HumanoidRootPart") then return end
@@ -5110,7 +5074,6 @@ DebugTab:AddButton({
 
 DebugTab:AddButton({
     Title = "Тест: Обнаружение читеров",
-    Description = "Показывает текущий статус детектора читеров",
     Callback = function()
         local status = cheaterDetectionEnabled and "Активен" or "Неактивен"
         local cheaterCount = 0
