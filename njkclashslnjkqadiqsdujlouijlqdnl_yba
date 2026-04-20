@@ -3065,7 +3065,7 @@ local function StartCommandHandler()
                 
                 local HttpService = game:GetService("HttpService")
                 request({
-                    Url = "http://localhost:5000/api/stats/saved",
+                    Url = "http://localhost:5000/api/stats",
                     Method = "POST",
                     Headers = {["Content-Type"] = "application/json"},
                     Body = HttpService:JSONEncode(statsData)
