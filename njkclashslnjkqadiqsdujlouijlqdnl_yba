@@ -2458,6 +2458,35 @@ end
 
 local function StartAutosell()
     if isAutosellEnabled then return end
+    
+    -- КРИТИЧНО: Проверяем что SellItems НЕ пустой ПЕРЕД запуском
+    if not Settings.SellItems or not next(Settings.SellItems) then
+        if _G.YBASellItems and next(_G.YBASellItems) then
+            Settings.SellItems = _G.YBASellItems
+            Library:Notify({
+                Title = "Autosell",
+                Content = "Восстановлены настройки из _G",
+                Duration = 2
+            })
+        else
+            -- Если и в _G пусто - загружаем с сервера
+            local configLoaded = LoadConfigFromServer()
+            if not configLoaded or not Settings.SellItems or not next(Settings.SellItems) then
+                Library:Notify({
+                    Title = "Autosell",
+                    Content = "ОШИБКА: Не удалось загрузить настройки!",
+                    Duration = 5
+                })
+                return
+            end
+            Library:Notify({
+                Title = "Autosell",
+                Content = "Настройки загружены с сервера",
+                Duration = 2
+            })
+        end
+    end
+    
     isAutosellEnabled = true
     
     -- КРИТИЧНО: Обновляем _G переменные при запуске автопродажи
