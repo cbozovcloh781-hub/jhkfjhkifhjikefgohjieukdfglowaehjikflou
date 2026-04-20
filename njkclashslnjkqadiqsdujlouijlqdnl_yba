@@ -3721,7 +3721,50 @@ ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enab
 -- НОВОЕ: Просмотр читеров (без автосвапа)
 local cheaterViewEnabled = false
 
-ESPTab:AddToggle("CheaterView", {Title = "👁️ Просмотр читеров", Description = "Выделяет читеров оранжевым (без автосвапа)", Default = false, Callback = function(Value) cheaterViewEnabled = Value if Value then Library:Notify({Title = "Просмотр читеров", Content = "Читеры будут выделены оранжевым", Duration = 3}) task.spawn(function() while cheaterViewEnabled do for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local currentTime = tick() local distance = (currentPos - lastPos).Magnitude local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true Library:Notify({Title = "Читер обнаружен!", Content = player.Name .. " использует телепорт (скорость: " .. math.floor(speed) .. " studs/s)", Duration = 5}) end end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end task.wait(0.5) end end) else detectedCheaters = {} Library:Notify({Title = "Просмотр читеров", Content = "Просмотр читеров отключен", Duration = 3}) end end})
+-- НОВОЕ: Функция для маркировки читеров в табе игроков
+local function UpdatePlayerlistCheaterTags()
+    task.spawn(function()
+        while cheaterViewEnabled do
+            pcall(function()
+                local playerGui = Player.PlayerGui
+                local hud = playerGui:FindFirstChild("HUD")
+                if hud then
+                    local playerlist = hud:FindFirstChild("Playerlist")
+                    if playerlist then
+                        -- Проходим по всем игрокам в табе
+                        for _, playerFrame in pairs(playerlist:GetChildren()) do
+                            if playerFrame:IsA("Frame") or playerFrame:IsA("GuiObject") then
+                                local playerNameLabel = playerFrame:FindFirstChild("PlayerName")
+                                if playerNameLabel and playerNameLabel:IsA("TextLabel") then
+                                    -- Находим игрока по имени
+                                    local playerName = playerNameLabel.Text:gsub("%[CHEATER%] ", "") -- Убираем старую метку
+                                    local targetPlayer = Players:FindFirstChild(playerName)
+                                    
+                                    if targetPlayer and detectedCheaters[targetPlayer.UserId] then
+                                        -- Помечаем читера
+                                        if not playerNameLabel.Text:find("%[CHEATER%]") then
+                                            playerNameLabel.Text = "[CHEATER] " .. playerName
+                                            playerNameLabel.TextColor3 = Color3.fromRGB(255, 165, 0) -- Оранжевый
+                                        end
+                                    else
+                                        -- Убираем метку если игрок не читер
+                                        if playerNameLabel.Text:find("%[CHEATER%]") then
+                                            playerNameLabel.Text = playerName
+                                            playerNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Белый
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(1) -- Обновляем каждую секунду
+        end
+    end)
+end
+
+ESPTab:AddToggle("CheaterView", {Title = "👁️ Просмотр читеров", Description = "Выделяет читеров оранжевым (без автосвапа)", Default = false, Callback = function(Value) cheaterViewEnabled = Value if Value then Library:Notify({Title = "Просмотр читеров", Content = "Читеры будут выделены оранжевым", Duration = 3}) UpdatePlayerlistCheaterTags() task.spawn(function() while cheaterViewEnabled do for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local currentTime = tick() local distance = (currentPos - lastPos).Magnitude local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true Library:Notify({Title = "Читер обнаружен!", Content = player.Name .. " использует телепорт (скорость: " .. math.floor(speed) .. " studs/s)", Duration = 5}) end end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end task.wait(0.5) end end) else detectedCheaters = {} Library:Notify({Title = "Просмотр читеров", Content = "Просмотр читеров отключен", Duration = 3}) end end})
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() SaveConfigToServer() end})
