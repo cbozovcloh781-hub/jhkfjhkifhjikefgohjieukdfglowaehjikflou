@@ -1069,6 +1069,11 @@ if _G.YBAESPEnabled ~= nil then
     ESPSettings.Enabled = _G.YBAESPEnabled
 end
 
+-- КРИТИЧНО: Восстанавливаем состояние CheaterView
+if Settings.CheaterViewEnabled then
+    cheaterViewEnabled = true
+end
+
 -- Server Hop Function (ДОЛЖНА БЫТЬ ПЕРЕД StartCheaterDetection)
 local function ServerHop()
     Library:Notify({
@@ -3472,6 +3477,12 @@ local function DestroyAllFunctions()
     pcall(function() if consoleEnabled then StopConsole() end end)
     pcall(function() if commandHandlerEnabled then StopCommandHandler() end end)
     
+    pcall(function() 
+        cheaterViewEnabled = false
+        if cheaterViewThread then task.cancel(cheaterViewThread) cheaterViewThread = nil end
+        if cheaterDetectionThread then task.cancel(cheaterDetectionThread) cheaterDetectionThread = nil end
+    end)
+    
     
     
     -- КРИТИЧНО: Удаляем консоль
@@ -3713,10 +3724,17 @@ ESPTab:AddToggle("ESPEnabled", {Title = "Enable ESP", Default = ESPSettings.Enab
 -- НОВОЕ: Просмотр читеров (без автосвапа)
 local cheaterViewEnabled = false
 local cheaterTimers = {}  -- {userId = lastViolationTime}
+local cheaterViewThread = nil
+local cheaterDetectionThread = nil
 
 -- НОВОЕ: Функция для маркировки читеров в табе игроков
 local function UpdatePlayerlistCheaterTags()
-    task.spawn(function()
+    if cheaterViewThread then
+        pcall(function() task.cancel(cheaterViewThread) end)
+        cheaterViewThread = nil
+    end
+    
+    cheaterViewThread = task.spawn(function()
         while cheaterViewEnabled do
             pcall(function()
                 local playerGui = Player.PlayerGui
@@ -3752,12 +3770,56 @@ local function UpdatePlayerlistCheaterTags()
                     end
                 end
             end)
-            task.wait(1) -- Обновляем каждую секунду
+            task.wait(1)
         end
+        cheaterViewThread = nil
     end)
 end
 
-ESPTab:AddToggle("CheaterView", {Title = "Show Cheaters", Default = Settings.CheaterViewEnabled or false, Callback = function(Value) cheaterViewEnabled = Value Settings.CheaterViewEnabled = Value saveSettings() SaveConfigToServer() if Value then UpdatePlayerlistCheaterTags() task.spawn(function() while cheaterViewEnabled do local currentTime = tick() for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local distance = (currentPos - lastPos).Magnitude local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true end cheaterTimers[player.UserId] = currentTime end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end for userId, lastViolation in pairs(cheaterTimers) do if currentTime - lastViolation >= 60 then detectedCheaters[userId] = nil cheaterTimers[userId] = nil end end task.wait(0.5) end end) else detectedCheaters = {} cheaterTimers = {} end end})
+ESPTab:AddToggle("CheaterView", {Title = "Show Cheaters", Default = Settings.CheaterViewEnabled or false, Callback = function(Value) cheaterViewEnabled = Value Settings.CheaterViewEnabled = Value saveSettings() SaveConfigToServer() if Value then UpdatePlayerlistCheaterTags() if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) end cheaterDetectionThread = task.spawn(function() while cheaterViewEnabled do local currentTime = tick() for _, player in pairs(Players:GetPlayers()) do if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then local currentPos = player.Character.HumanoidRootPart.Position if playerPositions[player.UserId] then local lastPos = playerPositions[player.UserId].Position local lastTime = playerPositions[player.UserId].Time local timeDiff = currentTime - lastTime if timeDiff > 0.5 and timeDiff < 2 then local distance = (currentPos - lastPos).Magnitude local speed = distance / timeDiff if speed > 400 then if not detectedCheaters[player.UserId] then detectedCheaters[player.UserId] = true end cheaterTimers[player.UserId] = currentTime end end end playerPositions[player.UserId] = {Position = currentPos, Time = tick()} end end for userId, lastViolation in pairs(cheaterTimers) do if currentTime - lastViolation >= 60 then detectedCheaters[userId] = nil cheaterTimers[userId] = nil end end task.wait(0.5) end cheaterDetectionThread = nil end) else detectedCheaters = {} cheaterTimers = {} if cheaterViewThread then pcall(function() task.cancel(cheaterViewThread) end) cheaterViewThread = nil end if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) cheaterDetectionThread = nil end end end})
+
+-- КРИТИЧНО: Автозапуск CheaterView при загрузке скрипта
+if Settings.CheaterViewEnabled and cheaterViewEnabled then
+    task.spawn(function()
+        task.wait(1)
+        UpdatePlayerlistCheaterTags()
+        if cheaterDetectionThread then pcall(function() task.cancel(cheaterDetectionThread) end) end
+        cheaterDetectionThread = task.spawn(function()
+            while cheaterViewEnabled do
+                local currentTime = tick()
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= Player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        local currentPos = player.Character.HumanoidRootPart.Position
+                        if playerPositions[player.UserId] then
+                            local lastPos = playerPositions[player.UserId].Position
+                            local lastTime = playerPositions[player.UserId].Time
+                            local timeDiff = currentTime - lastTime
+                            if timeDiff > 0.5 and timeDiff < 2 then
+                                local distance = (currentPos - lastPos).Magnitude
+                                local speed = distance / timeDiff
+                                if speed > 400 then
+                                    if not detectedCheaters[player.UserId] then
+                                        detectedCheaters[player.UserId] = true
+                                    end
+                                    cheaterTimers[player.UserId] = currentTime
+                                end
+                            end
+                        end
+                        playerPositions[player.UserId] = {Position = currentPos, Time = tick()}
+                    end
+                end
+                for userId, lastViolation in pairs(cheaterTimers) do
+                    if currentTime - lastViolation >= 60 then
+                        detectedCheaters[userId] = nil
+                        cheaterTimers[userId] = nil
+                    end
+                end
+                task.wait(0.5)
+            end
+            cheaterDetectionThread = nil
+        end)
+    end)
+end
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() SaveConfigToServer() end})
@@ -4093,101 +4155,7 @@ Options.MoneyFarmEnabled = AutoTab:AddToggle("MoneyFarmEnabled", {
     end
 })
 
-Options.AutoDropMoney = AutoTab:AddToggle("AutoDropMoney", {
-    Title = "Режим продажи",
-    Default = Settings.AutoDropMoney,
-    Callback = function(Value)
-        Settings.AutoDropMoney = Value
-        saveSettings()
-        SaveConfigToServer()  -- Сохраняем на сервер
-        
-        if Value then
-            Library:Notify({
-                Title = "Money Farm",
-                Content = "Режим продажи активирован! Деньги будут дропнуты вручную.",
-                Duration = 5
-            })
-        end
-    end
-})
 
-AutoTab:AddInput("ReceiverUsername", {
-    Title = "Ник получателя",
-    Default = Settings.ReceiverUsername,
-    Placeholder = "Введите ник...",
-    Callback = function(Value)
-        Settings.ReceiverUsername = Value
-        saveSettings()
-        SaveConfigToServer()  -- Сохраняем на сервер
-    end
-})
-
-AutoTab:AddButton({
-    Title = "Дропнуть все деньги",
-    Callback = function()
-        local money = GetPlayerMoney()
-        if money > 0 then
-            local success = DropMoney(money)
-            if success then
-                Library:Notify({
-                    Title = "Money Farm",
-                    Content = "Дропнуто $" .. money,
-                    Duration = 3
-                })
-            else
-                Library:Notify({
-                    Title = "Money Farm",
-                    Content = "Ошибка дропа денег!",
-                    Duration = 3
-                })
-            end
-        else
-            Library:Notify({
-                Title = "Money Farm",
-                Content = "Нет денег для дропа",
-                Duration = 3
-            })
-        end
-    end
-})
-
-AutoTab:AddButton({
-    Title = "Тест: Отправить уведомление",
-    Callback = function()
-        local money = GetPlayerMoney()
-        local success = SendMoneyNotification(money, Settings.ReceiverUsername)
-        
-        if success then
-            Library:Notify({
-                Title = "Money Farm",
-                Content = "Уведомление отправлено успешно!",
-                Duration = 3
-            })
-        else
-            Library:Notify({
-                Title = "Money Farm",
-                Content = "Ошибка отправки! Проверьте что сервер запущен.",
-                Duration = 3
-            })
-        end
-    end
-})
-
-AutoTab:AddButton({
-    Title = "Показать текущий баланс",
-    Callback = function()
-        local money = GetPlayerMoney()
-        currentMoney = money
-        
-        Library:Notify({
-            Title = "Money Farm",
-            Content = "💰 Баланс: $" .. money,
-            Duration = 3
-        })
-        
-        
-    end
-})
 
 local PlayerDropdown = TeleportTab:AddDropdown("PlayerSelect", {
     Title = "Select Player",
@@ -4290,6 +4258,12 @@ function Console.Create()
     
     closeBtn.MouseButton1Click:Connect(function()
         Console.Destroy()
+        Settings.CustomConsole = false
+        saveSettings()
+        SaveConfigToServer()
+        if Options and Options.CustomConsole then
+            Options.CustomConsole:SetValue(false)
+        end
     end)
     
     -- НОВОЕ: Кнопка сворачивания
@@ -4737,11 +4711,7 @@ SettingsTab:AddButton({
     end
 })
 
--- Test Tab
-local DebugTab = Window:AddTab({
-    Title = "Test",
-    Icon = "bug"
-})
+
 
 DebugTab:AddButton({
     Title = "Тест: Найти ближайший предмет",
