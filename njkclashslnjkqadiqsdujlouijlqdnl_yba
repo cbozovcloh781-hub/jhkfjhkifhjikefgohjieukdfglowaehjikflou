@@ -1020,7 +1020,7 @@ if _G.YBAStartTime then
     
 end
 
--- НОВОЕ: Если _G пустые - пробуем загрузить с сервера
+-- LOAD STATS FROM SERVER IF _G IS EMPTY
 if not _G.YBAItemsCollected and not _G.YBAStartTime then
     pcall(function()
         local HttpService = game:GetService("HttpService")
@@ -1032,7 +1032,6 @@ if not _G.YBAItemsCollected and not _G.YBAStartTime then
         if response and response.StatusCode == 200 then
             local serverStats = HttpService:JSONDecode(response.Body)
             
-            -- Загружаем статистику с сервера
             if serverStats.items_collected then
                 farmStats.itemsCollected = serverStats.items_collected
                 farmStats.prevItemsCollected = serverStats.items_collected
@@ -1061,7 +1060,6 @@ if not _G.YBAItemsCollected and not _G.YBAStartTime then
                 farmStats.startTime = serverStats.start_time
                 _G.YBAStartTime = serverStats.start_time
             end
-            
         end
     end)
 end
