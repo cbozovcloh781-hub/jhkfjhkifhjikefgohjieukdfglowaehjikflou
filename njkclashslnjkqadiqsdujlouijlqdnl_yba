@@ -2334,10 +2334,10 @@ local function StartAutofarm()
                         
                         -- УБРАНО: Спам логов и уведомлений
                         
-                        task.wait(0.3)  -- 300мс задержка после успешного подбора
+                        task.wait(0.35)  -- 300мс задержка после успешного подбора
                     else
                         -- Предмет НЕ подобрался (без спама)
-                        task.wait(0.5)  -- 500мс если не подобрали (больше задержка)
+                        task.wait(0.6)  -- 500мс если не подобрали (больше задержка)
                     end
                 elseif not prompt and not item then
                     if farmPlatform then
@@ -3654,6 +3654,48 @@ MovementTab:AddSlider("SpeedValue", {
                     humanoid.WalkSpeed = Value
                 end
             end
+        end
+    end
+})
+
+
+-- Anti-AFK
+local antiAFKConnection = nil
+local antiAFKEnabled = false
+
+local function StartAntiAFK()
+    if antiAFKConnection then return end
+    antiAFKEnabled = true
+    
+    antiAFKConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if antiAFKEnabled then
+            local VirtualUser = game:GetService("VirtualUser")
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end
+    end)
+end
+
+local function StopAntiAFK()
+    antiAFKEnabled = false
+    if antiAFKConnection then
+        antiAFKConnection:Disconnect()
+        antiAFKConnection = nil
+    end
+end
+
+MovementTab:AddToggle("AntiAFK", {
+    Title = "Anti-AFK",
+    Default = Settings.AntiAFK or false,
+    Callback = function(Value)
+        Settings.AntiAFK = Value
+        saveSettings()
+        SaveConfigToServer()
+        
+        if Value then
+            StartAntiAFK()
+        else
+            StopAntiAFK()
         end
     end
 })
