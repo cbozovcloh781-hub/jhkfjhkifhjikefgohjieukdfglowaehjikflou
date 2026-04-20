@@ -754,6 +754,8 @@ local function SaveConfigToServer()
             money_farm_enabled = Settings.MoneyFarmEnabled,
             auto_drop_money = Settings.AutoDropMoney,
             autobuy_lucky_arrow = Settings.AutobuyLuckyArrow,
+            cheater_view_enabled = Settings.CheaterViewEnabled or false,
+            anti_afk = Settings.AntiAFK or false,
             
             -- Дропдауны
             farm_items = farm_items,
@@ -830,6 +832,8 @@ local function LoadConfigFromServer()
             if serverConfig.money_farm_enabled ~= nil then Settings.MoneyFarmEnabled = serverConfig.money_farm_enabled end
             if serverConfig.auto_drop_money ~= nil then Settings.AutoDropMoney = serverConfig.auto_drop_money end
             if serverConfig.autobuy_lucky_arrow ~= nil then Settings.AutobuyLuckyArrow = serverConfig.autobuy_lucky_arrow end
+            if serverConfig.cheater_view_enabled ~= nil then Settings.CheaterViewEnabled = serverConfig.cheater_view_enabled end
+            if serverConfig.anti_afk ~= nil then Settings.AntiAFK = serverConfig.anti_afk end
             
             -- Применяем дропдауны
             if serverConfig.farm_items then
@@ -2334,10 +2338,10 @@ local function StartAutofarm()
                         
                         -- УБРАНО: Спам логов и уведомлений
                         
-                        task.wait(0.35)  -- 300мс задержка после успешного подбора
+                        task.wait(0.5)  -- Задержка после успешного подбора
                     else
                         -- Предмет НЕ подобрался (без спама)
-                        task.wait(0.6)  -- 500мс если не подобрали (больше задержка)
+                        task.wait(0.8)  -- Если не подобрали (больше задержка)
                     end
                 elseif not prompt and not item then
                     if farmPlatform then
@@ -3902,6 +3906,15 @@ if Settings.CheaterViewEnabled and cheaterViewEnabled then
         end)
     end)
 end
+
+-- КРИТИЧНО: Автозапуск Anti-AFK при загрузке скрипта
+if Settings.AntiAFK then
+    task.spawn(function()
+        task.wait(1)
+        StartAntiAFK()
+    end)
+end
+
 ESPTab:AddToggle("BoxESP", {Title = "Box ESP", Default = ESPSettings.BoxESP, Callback = function(Value) ESPSettings.BoxESP = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddDropdown("BoxStyle", {Title = "Box Style", Values = {"Corner", "Full"}, Default = ESPSettings.BoxStyle, Callback = function(Value) ESPSettings.BoxStyle = Value saveSettings() SaveConfigToServer() end})
 ESPTab:AddToggle("TracerESP", {Title = "Tracer ESP", Default = ESPSettings.TracerESP, Callback = function(Value) ESPSettings.TracerESP = Value saveSettings() SaveConfigToServer() end})
