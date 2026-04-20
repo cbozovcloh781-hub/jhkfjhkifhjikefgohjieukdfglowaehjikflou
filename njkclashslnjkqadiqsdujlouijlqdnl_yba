@@ -1412,7 +1412,7 @@ local function StartCheaterDetection()
                         if timeDiff > 0.5 and timeDiff < 2 then
                             local speed = distance / timeDiff
                             
-                            if speed > 400 then -- 400+ studs/sec = явный телепорт
+                            if speed > 600 then -- 600+ studs/sec = явный телепорт
                                 -- ИСПРАВЛЕНО: Инициализируем структуру данных если её нет
                                 if not cheaterDetections[player.UserId] then
                                     cheaterDetections[player.UserId] = {count = 0, lastWarning = currentTime}
@@ -3837,7 +3837,7 @@ if Settings.CheaterViewEnabled and cheaterViewEnabled then
                             if timeDiff > 0.5 and timeDiff < 2 then
                                 local distance = (currentPos - lastPos).Magnitude
                                 local speed = distance / timeDiff
-                                if speed > 400 then
+                                if speed > 600 then
                                     if not detectedCheaters[player.UserId] then
                                         detectedCheaters[player.UserId] = true
                                     end
