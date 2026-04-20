@@ -1020,6 +1020,52 @@ if _G.YBAStartTime then
     
 end
 
+-- НОВОЕ: Если _G пустые - пробуем загрузить с сервера
+if not _G.YBAItemsCollected and not _G.YBAStartTime then
+    pcall(function()
+        local HttpService = game:GetService("HttpService")
+        local response = request({
+            Url = "http://localhost:5000/api/stats",
+            Method = "GET"
+        })
+        
+        if response and response.StatusCode == 200 then
+            local serverStats = HttpService:JSONDecode(response.Body)
+            
+            -- Загружаем статистику с сервера
+            if serverStats.items_collected then
+                farmStats.itemsCollected = serverStats.items_collected
+                farmStats.prevItemsCollected = serverStats.items_collected
+                _G.YBAItemsCollected = serverStats.items_collected
+            end
+            if serverStats.money_collected then
+                farmStats.moneyCollected = serverStats.money_collected
+                farmStats.prevMoneyCollected = serverStats.money_collected
+                _G.YBAMoneyCollected = serverStats.money_collected
+            end
+            if serverStats.items_sold then
+                farmStats.itemsSold = serverStats.items_sold
+                farmStats.prevItemsSold = serverStats.items_sold
+                _G.YBAItemsSold = serverStats.items_sold
+            end
+            if serverStats.money_sold then
+                farmStats.moneySold = serverStats.money_sold
+                farmStats.prevMoneySold = serverStats.money_sold
+                _G.YBAMoneySold = serverStats.money_sold
+            end
+            if serverStats.server_hops then
+                farmStats.serverHops = serverStats.server_hops
+                _G.YBAServerHops = serverStats.server_hops
+            end
+            if serverStats.start_time then
+                farmStats.startTime = serverStats.start_time
+                _G.YBAStartTime = serverStats.start_time
+            end
+            
+        end
+    end)
+end
+
 -- КРИТИЧНО: Восстанавливаем состояние ESP из _G
 if _G.YBAESPEnabled ~= nil then
     ESPSettings.Enabled = _G.YBAESPEnabled
@@ -1115,7 +1161,10 @@ local function ServerHop()
             lucky_arrows = luckyArrows,
             lucky_masks = luckyMasks,
             autofarm_status = Settings.Autofarm,
-            autosell_status = Settings.Autosell
+            autosell_status = Settings.Autosell,
+            -- НОВОЕ: Флаг что это свап сервера
+            is_server_hop = true,
+            start_time = _G.YBAStartTime
         }
         
         
