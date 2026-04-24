@@ -3386,7 +3386,9 @@ local function UpdateESP(player)
     local bottomScreen = Camera:WorldToViewportPoint(bottomPos)
     local screenSize = math.abs(bottomScreen.Y - topScreen.Y)
     local boxWidth = screenSize * 0.65
-    local boxPosition = Vector2.new(pos.X - boxWidth/2, topScreen.Y)
+    -- КРИТИЧНО: Используем среднее X между верхом и низом для точного центрирования
+    local centerX = (topScreen.X + bottomScreen.X) / 2
+    local boxPosition = Vector2.new(centerX - boxWidth/2, topScreen.Y)
     local boxSize = Vector2.new(boxWidth, screenSize)
     for _, obj in pairs(esp.Box) do obj.Visible = false end
     if ESPSettings.BoxESP then
