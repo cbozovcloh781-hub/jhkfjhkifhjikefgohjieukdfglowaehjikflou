@@ -1996,21 +1996,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОПТИМАЛЬНАЯ СКОРОСТЬ (понижено для стабильности)
+    -- ОПТИМАЛЬНАЯ СКОРОСТЬ (увеличена для быстрого фарма)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 30
-        stepDelay = 0.025
+        stepSize = 40  -- было 30
+        stepDelay = 0.020  -- было 0.025
     elseif distance < 300 then
-        stepSize = 36
-        stepDelay = 0.022
+        stepSize = 50  -- было 36
+        stepDelay = 0.018  -- было 0.022
     elseif distance < 600 then
-        stepSize = 42
-        stepDelay = 0.019
+        stepSize = 60  -- было 42
+        stepDelay = 0.015  -- было 0.019
     else
-        stepSize = 46
-        stepDelay = 0.016
+        stepSize = 70  -- было 46
+        stepDelay = 0.012  -- было 0.016
     end
     
     local direction = (targetPos - startPos).Unit
