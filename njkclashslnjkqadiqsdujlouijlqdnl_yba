@@ -733,45 +733,49 @@ local function SaveConfigToServer()
         -- КРИТИЧНО: Обновляем _G переменную перед сохранением
         _G.YBAAutoServerHop = Settings.AutoServerHop
         
+        -- ПОЛНЫЙ конфиг со ВСЕМИ настройками
         local config = {
-            -- Тумблеры
-            autofarm = Settings.Autofarm,
-            autosell = Settings.Autosell,
-            auto_server_hop = Settings.AutoServerHop,
+            -- Movement
             fly = Settings.Fly,
+            fly_speed = Settings.FlySpeed,
             noclip = Settings.NoClip,
             speed = Settings.Speed,
+            speed_value = Settings.SpeedValue,
             infinite_jump = Settings.InfiniteJump,
             jump_hack = Settings.JumpHack,
+            jump_height = Settings.JumpHeight,
+            anti_afk = Settings.AntiAFK or false,
+            
+            -- Autofarm
+            autofarm = Settings.Autofarm,
+            farm_items = farm_items,
+            farm_delay = Settings.FarmDelay,
+            pickup_attempts = Settings.PickupAttempts,
+            pickup_attempt_delay = Settings.PickupAttemptDelay,
+            autobuy_lucky_arrow = Settings.AutobuyLuckyArrow,
+            
+            -- Autosell
+            autosell = Settings.Autosell,
+            sell_items = sell_items,
+            
+            -- Server Hop
+            auto_server_hop = Settings.AutoServerHop,
+            cheater_detection_sensitivity = Settings.CheaterDetectionSensitivity,
+            
+            -- ESP
             esp_enabled = ESPSettings.Enabled,
             box_esp = ESPSettings.BoxESP,
+            box_style = ESPSettings.BoxStyle,
             tracer_esp = ESPSettings.TracerESP,
             health_esp = ESPSettings.HealthESP,
             name_esp = ESPSettings.NameESP,
             chams_enabled = ESPSettings.ChamsEnabled,
             skeleton_esp = ESPSettings.SkeletonESP,
             team_check = ESPSettings.TeamCheck,
-            unlock_zoom = Settings.UnlockZoom,
-            custom_console = Settings.CustomConsole,
-            money_farm_enabled = Settings.MoneyFarmEnabled,
-            auto_drop_money = Settings.AutoDropMoney,
-            autobuy_lucky_arrow = Settings.AutobuyLuckyArrow,
-            cheater_view_enabled = Settings.CheaterViewEnabled or false,
-            anti_afk = Settings.AntiAFK or false,
-            
-            -- Дропдауны
-            farm_items = farm_items,
-            sell_items = sell_items,
-            box_style = ESPSettings.BoxStyle,
-            
-            -- Слайдеры
-            fly_speed = Settings.FlySpeed,
-            speed_value = Settings.SpeedValue,
-            jump_height = Settings.JumpHeight,
-            cheater_detection_sensitivity = Settings.CheaterDetectionSensitivity,
             max_distance = ESPSettings.MaxDistance,
+            cheater_view_enabled = Settings.CheaterViewEnabled or false,
             
-            -- Колорпикеры
+            -- Colors
             box_color = colorToRGB(Colors.Box),
             tracer_color = colorToRGB(Colors.Tracer),
             name_color = colorToRGB(Colors.Name),
@@ -779,8 +783,13 @@ local function SaveConfigToServer()
             chams_outline_color = colorToRGB(ESPSettings.ChamsOutlineColor),
             skeleton_color = colorToRGB(ESPSettings.SkeletonColor),
             
-            -- Инпуты
-            receiver_username = Settings.ReceiverUsername
+            -- Other
+            unlock_zoom = Settings.UnlockZoom,
+            custom_console = Settings.CustomConsole,
+            money_farm_enabled = Settings.MoneyFarmEnabled,
+            auto_drop_money = Settings.AutoDropMoney,
+            receiver_username = Settings.ReceiverUsername,
+            platform = Settings.Platform
         }
         
         request({
@@ -789,8 +798,6 @@ local function SaveConfigToServer()
             Headers = {["Content-Type"] = "application/json"},
             Body = HttpService:JSONEncode(config)
         })
-        
-        
     end)
 end
 
@@ -806,60 +813,63 @@ local function LoadConfigFromServer()
         if response and response.StatusCode == 200 then
             local serverConfig = HttpService:JSONDecode(response.Body)
             
-            
             -- Конвертируем RGB таблицы в Color3
             local function rgbToColor(rgb)
                 return Color3.fromRGB(rgb.R or 255, rgb.G or 255, rgb.B or 255)
             end
             
-            -- Применяем тумблеры
-            if serverConfig.autofarm ~= nil then Settings.Autofarm = serverConfig.autofarm end
-            if serverConfig.autosell ~= nil then Settings.Autosell = serverConfig.autosell end
-            if serverConfig.auto_server_hop ~= nil then Settings.AutoServerHop = serverConfig.auto_server_hop end
+            -- Movement
             if serverConfig.fly ~= nil then Settings.Fly = serverConfig.fly end
+            if serverConfig.fly_speed then Settings.FlySpeed = serverConfig.fly_speed end
             if serverConfig.noclip ~= nil then Settings.NoClip = serverConfig.noclip end
             if serverConfig.speed ~= nil then Settings.Speed = serverConfig.speed end
+            if serverConfig.speed_value then Settings.SpeedValue = serverConfig.speed_value end
             if serverConfig.infinite_jump ~= nil then Settings.InfiniteJump = serverConfig.infinite_jump end
             if serverConfig.jump_hack ~= nil then Settings.JumpHack = serverConfig.jump_hack end
-            if serverConfig.esp_enabled ~= nil then ESPSettings.Enabled = serverConfig.esp_enabled end
-            if serverConfig.box_esp ~= nil then ESPSettings.BoxESP = serverConfig.box_esp end
-            if serverConfig.tracer_esp ~= nil then ESPSettings.TracerESP = serverConfig.tracer_esp end
-            if serverConfig.health_esp ~= nil then ESPSettings.HealthESP = serverConfig.health_esp end
-            if serverConfig.name_esp ~= nil then ESPSettings.NameESP = serverConfig.name_esp end
-            if serverConfig.chams_enabled ~= nil then ESPSettings.ChamsEnabled = serverConfig.chams_enabled end
-            if serverConfig.skeleton_esp ~= nil then ESPSettings.SkeletonESP = serverConfig.skeleton_esp end
-            if serverConfig.team_check ~= nil then ESPSettings.TeamCheck = serverConfig.team_check end
-            if serverConfig.unlock_zoom ~= nil then Settings.UnlockZoom = serverConfig.unlock_zoom end
-            if serverConfig.custom_console ~= nil then Settings.CustomConsole = serverConfig.custom_console end
-            if serverConfig.money_farm_enabled ~= nil then Settings.MoneyFarmEnabled = serverConfig.money_farm_enabled end
-            if serverConfig.auto_drop_money ~= nil then Settings.AutoDropMoney = serverConfig.auto_drop_money end
-            if serverConfig.autobuy_lucky_arrow ~= nil then Settings.AutobuyLuckyArrow = serverConfig.autobuy_lucky_arrow end
-            if serverConfig.cheater_view_enabled ~= nil then Settings.CheaterViewEnabled = serverConfig.cheater_view_enabled end
+            if serverConfig.jump_height then Settings.JumpHeight = serverConfig.jump_height end
             if serverConfig.anti_afk ~= nil then Settings.AntiAFK = serverConfig.anti_afk end
             
-            -- Применяем дропдауны
+            -- Autofarm
+            if serverConfig.autofarm ~= nil then Settings.Autofarm = serverConfig.autofarm end
+            if serverConfig.farm_delay then Settings.FarmDelay = serverConfig.farm_delay end
+            if serverConfig.pickup_attempts then Settings.PickupAttempts = serverConfig.pickup_attempts end
+            if serverConfig.pickup_attempt_delay then Settings.PickupAttemptDelay = serverConfig.pickup_attempt_delay end
+            if serverConfig.autobuy_lucky_arrow ~= nil then Settings.AutobuyLuckyArrow = serverConfig.autobuy_lucky_arrow end
+            
             if serverConfig.farm_items then
                 Settings.FarmItems = {}
                 for _, item in ipairs(serverConfig.farm_items) do
                     Settings.FarmItems[item] = true
                 end
             end
+            
+            -- Autosell
+            if serverConfig.autosell ~= nil then Settings.Autosell = serverConfig.autosell end
             if serverConfig.sell_items then
                 Settings.SellItems = {}
                 for _, item in ipairs(serverConfig.sell_items) do
                     Settings.SellItems[item] = true
                 end
             end
-            if serverConfig.box_style then ESPSettings.BoxStyle = serverConfig.box_style end
             
-            -- Применяем слайдеры
-            if serverConfig.fly_speed then Settings.FlySpeed = serverConfig.fly_speed end
-            if serverConfig.speed_value then Settings.SpeedValue = serverConfig.speed_value end
-            if serverConfig.jump_height then Settings.JumpHeight = serverConfig.jump_height end
+            -- Server Hop
+            if serverConfig.auto_server_hop ~= nil then Settings.AutoServerHop = serverConfig.auto_server_hop end
             if serverConfig.cheater_detection_sensitivity then Settings.CheaterDetectionSensitivity = serverConfig.cheater_detection_sensitivity end
-            if serverConfig.max_distance then ESPSettings.MaxDistance = serverConfig.max_distance end
             
-            -- Применяем колорпикеры
+            -- ESP
+            if serverConfig.esp_enabled ~= nil then ESPSettings.Enabled = serverConfig.esp_enabled end
+            if serverConfig.box_esp ~= nil then ESPSettings.BoxESP = serverConfig.box_esp end
+            if serverConfig.box_style then ESPSettings.BoxStyle = serverConfig.box_style end
+            if serverConfig.tracer_esp ~= nil then ESPSettings.TracerESP = serverConfig.tracer_esp end
+            if serverConfig.health_esp ~= nil then ESPSettings.HealthESP = serverConfig.health_esp end
+            if serverConfig.name_esp ~= nil then ESPSettings.NameESP = serverConfig.name_esp end
+            if serverConfig.chams_enabled ~= nil then ESPSettings.ChamsEnabled = serverConfig.chams_enabled end
+            if serverConfig.skeleton_esp ~= nil then ESPSettings.SkeletonESP = serverConfig.skeleton_esp end
+            if serverConfig.team_check ~= nil then ESPSettings.TeamCheck = serverConfig.team_check end
+            if serverConfig.max_distance then ESPSettings.MaxDistance = serverConfig.max_distance end
+            if serverConfig.cheater_view_enabled ~= nil then Settings.CheaterViewEnabled = serverConfig.cheater_view_enabled end
+            
+            -- Colors
             if serverConfig.box_color then Colors.Box = rgbToColor(serverConfig.box_color) end
             if serverConfig.tracer_color then Colors.Tracer = rgbToColor(serverConfig.tracer_color) end
             if serverConfig.name_color then Colors.Name = rgbToColor(serverConfig.name_color) end
@@ -867,8 +877,13 @@ local function LoadConfigFromServer()
             if serverConfig.chams_outline_color then ESPSettings.ChamsOutlineColor = rgbToColor(serverConfig.chams_outline_color) end
             if serverConfig.skeleton_color then ESPSettings.SkeletonColor = rgbToColor(serverConfig.skeleton_color) end
             
-            -- Применяем инпуты
+            -- Other
+            if serverConfig.unlock_zoom ~= nil then Settings.UnlockZoom = serverConfig.unlock_zoom end
+            if serverConfig.custom_console ~= nil then Settings.CustomConsole = serverConfig.custom_console end
+            if serverConfig.money_farm_enabled ~= nil then Settings.MoneyFarmEnabled = serverConfig.money_farm_enabled end
+            if serverConfig.auto_drop_money ~= nil then Settings.AutoDropMoney = serverConfig.auto_drop_money end
             if serverConfig.receiver_username then Settings.ReceiverUsername = serverConfig.receiver_username end
+            if serverConfig.platform ~= nil then Settings.Platform = serverConfig.platform end
             
             -- Обновляем _G переменные
             _G.YBAAutoFarmEnabled = Settings.Autofarm
@@ -877,7 +892,6 @@ local function LoadConfigFromServer()
             _G.YBAFarmItems = Settings.FarmItems
             _G.YBASellItems = Settings.SellItems
             _G.YBAESPEnabled = ESPSettings.Enabled
-            
             
             return true
         end
@@ -889,121 +903,92 @@ end
 
 -- КРИТИЧНО: Функция применения конфига к UI элементам
 local function ApplyConfigToUI()
-    -- Ждем создания всех Options элементов
-    local maxWait = 5  -- УМЕНЬШЕНО с 10 до 5 секунд
+    local maxWait = 5
     local waited = 0
     while waited < maxWait do
         if Options and Options.Autofarm and Options.FarmItems and Options.Autosell and Options.SellItems then
             break
         end
-        task.wait(0.1)  -- УМЕНЬШЕНО с 0.5 до 0.1
+        task.wait(0.1)
         waited = waited + 0.1
     end
     
-    if not Options then
-        return
-    end
+    if not Options then return end
     
-    -- Флаг для предотвращения автосохранения при программной установке
     local isApplyingConfig = true
     
-    -- === AUTOFARM TAB ===
-    if Options.Autofarm and Settings.Autofarm ~= nil then
-        Options.Autofarm:SetValue(Settings.Autofarm)
-    end
+    -- Movement
+    if Options.Fly and Settings.Fly ~= nil then Options.Fly:SetValue(Settings.Fly) end
+    if Options.FlySpeed and Settings.FlySpeed then Options.FlySpeed:SetValue(Settings.FlySpeed) end
+    if Options.NoClip and Settings.NoClip ~= nil then Options.NoClip:SetValue(Settings.NoClip) end
+    if Options.Speed and Settings.Speed ~= nil then Options.Speed:SetValue(Settings.Speed) end
+    if Options.SpeedValue and Settings.SpeedValue then Options.SpeedValue:SetValue(Settings.SpeedValue) end
+    if Options.InfiniteJump and Settings.InfiniteJump ~= nil then Options.InfiniteJump:SetValue(Settings.InfiniteJump) end
+    if Options.JumpHack and Settings.JumpHack ~= nil then Options.JumpHack:SetValue(Settings.JumpHack) end
+    if Options.JumpHeight and Settings.JumpHeight then Options.JumpHeight:SetValue(Settings.JumpHeight) end
+    if Options.AntiAFK and Settings.AntiAFK ~= nil then Options.AntiAFK:SetValue(Settings.AntiAFK) end
     
-    if Options.FarmItems and Settings.FarmItems then
-        Options.FarmItems:SetValue(Settings.FarmItems)
-    end
+    -- Autofarm
+    if Options.Autofarm and Settings.Autofarm ~= nil then Options.Autofarm:SetValue(Settings.Autofarm) end
+    if Options.FarmItems and Settings.FarmItems then Options.FarmItems:SetValue(Settings.FarmItems) end
+    if Options.FarmDelay and Settings.FarmDelay then Options.FarmDelay:SetValue(Settings.FarmDelay) end
+    if Options.PickupAttempts and Settings.PickupAttempts then Options.PickupAttempts:SetValue(Settings.PickupAttempts) end
+    if Options.PickupAttemptDelay and Settings.PickupAttemptDelay then Options.PickupAttemptDelay:SetValue(Settings.PickupAttemptDelay) end
+    if Options.AutobuyLuckyArrow and Settings.AutobuyLuckyArrow ~= nil then Options.AutobuyLuckyArrow:SetValue(Settings.AutobuyLuckyArrow) end
     
-    if Options.Autosell and Settings.Autosell ~= nil then
-        Options.Autosell:SetValue(Settings.Autosell)
-    end
+    -- Autosell
+    if Options.Autosell and Settings.Autosell ~= nil then Options.Autosell:SetValue(Settings.Autosell) end
+    if Options.SellItems and Settings.SellItems then Options.SellItems:SetValue(Settings.SellItems) end
     
-    if Options.SellItems and Settings.SellItems then
-        Options.SellItems:SetValue(Settings.SellItems)
-    end
+    -- Server Hop
+    if Options.AutoServerHop and Settings.AutoServerHop ~= nil then Options.AutoServerHop:SetValue(Settings.AutoServerHop) end
+    if Options.CheaterDetectionSensitivity and Settings.CheaterDetectionSensitivity then Options.CheaterDetectionSensitivity:SetValue(Settings.CheaterDetectionSensitivity) end
     
-    if Options.AutobuyLuckyArrow and Settings.AutobuyLuckyArrow ~= nil then
-        Options.AutobuyLuckyArrow:SetValue(Settings.AutobuyLuckyArrow)
-    end
+    -- ESP
+    if Options.ESPEnabled and ESPSettings.Enabled ~= nil then Options.ESPEnabled:SetValue(ESPSettings.Enabled) end
+    if Options.BoxESP and ESPSettings.BoxESP ~= nil then Options.BoxESP:SetValue(ESPSettings.BoxESP) end
+    if Options.BoxStyle and ESPSettings.BoxStyle then Options.BoxStyle:SetValue(ESPSettings.BoxStyle) end
+    if Options.TracerESP and ESPSettings.TracerESP ~= nil then Options.TracerESP:SetValue(ESPSettings.TracerESP) end
+    if Options.HealthESP and ESPSettings.HealthESP ~= nil then Options.HealthESP:SetValue(ESPSettings.HealthESP) end
+    if Options.NameESP and ESPSettings.NameESP ~= nil then Options.NameESP:SetValue(ESPSettings.NameESP) end
+    if Options.ChamsEnabled and ESPSettings.ChamsEnabled ~= nil then Options.ChamsEnabled:SetValue(ESPSettings.ChamsEnabled) end
+    if Options.SkeletonESP and ESPSettings.SkeletonESP ~= nil then Options.SkeletonESP:SetValue(ESPSettings.SkeletonESP) end
+    if Options.TeamCheck and ESPSettings.TeamCheck ~= nil then Options.TeamCheck:SetValue(ESPSettings.TeamCheck) end
+    if Options.MaxDistance and ESPSettings.MaxDistance then Options.MaxDistance:SetValue(ESPSettings.MaxDistance) end
+    if Options.CheaterView and Settings.CheaterViewEnabled ~= nil then Options.CheaterView:SetValue(Settings.CheaterViewEnabled) end
     
-    if Options.AutoServerHop and Settings.AutoServerHop ~= nil then
-        Options.AutoServerHop:SetValue(Settings.AutoServerHop)
-    end
+    -- Colors
+    if Options.BoxColor and Colors.Box then Options.BoxColor:SetValue(Colors.Box) end
+    if Options.TracerColor and Colors.Tracer then Options.TracerColor:SetValue(Colors.Tracer) end
+    if Options.NameColor and Colors.Name then Options.NameColor:SetValue(Colors.Name) end
+    if Options.ChamsFillColor and ESPSettings.ChamsFillColor then Options.ChamsFillColor:SetValue(ESPSettings.ChamsFillColor) end
+    if Options.ChamsOutlineColor and ESPSettings.ChamsOutlineColor then Options.ChamsOutlineColor:SetValue(ESPSettings.ChamsOutlineColor) end
+    if Options.SkeletonColor and ESPSettings.SkeletonColor then Options.SkeletonColor:SetValue(ESPSettings.SkeletonColor) end
     
-    if Options.MoneyFarmEnabled and Settings.MoneyFarmEnabled ~= nil then
-        Options.MoneyFarmEnabled:SetValue(Settings.MoneyFarmEnabled)
-    end
+    -- Other
+    if Options.UnlockZoom and Settings.UnlockZoom ~= nil then Options.UnlockZoom:SetValue(Settings.UnlockZoom) end
+    if Options.CustomConsole and Settings.CustomConsole ~= nil then Options.CustomConsole:SetValue(Settings.CustomConsole) end
+    if Options.MoneyFarmEnabled and Settings.MoneyFarmEnabled ~= nil then Options.MoneyFarmEnabled:SetValue(Settings.MoneyFarmEnabled) end
     
     isApplyingConfig = false
 end
 
 local function loadSettings()
-    local success, saved = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(readfile("YBA_Enhanced_Settings.json"))
-    end)
-    if success and saved then
-        for key, value in pairs(DefaultSettings) do
-            Settings[key] = saved[key] ~= nil and saved[key] or value
-        end
-        -- КРИТИЧНО: Загружаем состояние автофарма и автоселла
-        if saved.Autofarm ~= nil then
-            Settings.Autofarm = saved.Autofarm
-        end
-        if saved.Autosell ~= nil then
-            Settings.Autosell = saved.Autosell
-        end
-        if saved.FarmItems and type(saved.FarmItems) == "table" then
-            Settings.FarmItems = saved.FarmItems
-        else
-            Settings.FarmItems = {}
-        end
-        if saved.SellItems and type(saved.SellItems) == "table" then
-            Settings.SellItems = saved.SellItems
-        else
-            Settings.SellItems = {}
-        end
-        if saved.ESPSettings then for k, v in pairs(saved.ESPSettings) do ESPSettings[k] = v end end
-        if saved.ESPColors then
-            if saved.ESPColors.Box then Colors.Box = Color3.fromRGB(saved.ESPColors.Box.R, saved.ESPColors.Box.G, saved.ESPColors.Box.B) end
-            if saved.ESPColors.Tracer then Colors.Tracer = Color3.fromRGB(saved.ESPColors.Tracer.R, saved.ESPColors.Tracer.G, saved.ESPColors.Tracer.B) end
-            if saved.ESPColors.Name then Colors.Name = Color3.fromRGB(saved.ESPColors.Name.R, saved.ESPColors.Name.G, saved.ESPColors.Name.B) end
-        end
-    else
-        Settings = table_copy(DefaultSettings)
-    end
+    -- УБРАНО: Локальная загрузка больше не нужна - все с сервера
+    -- Инициализируем дефолтными значениями
+    Settings = table_copy(DefaultSettings)
 end
 
 local function saveSettings()
-    pcall(function()
-        local settingsToSave = table_copy(Settings)
-        settingsToSave.Autofarm = Settings.Autofarm  -- КРИТИЧНО: Сохраняем состояние автофарма
-        settingsToSave.Autosell = Settings.Autosell  -- КРИТИЧНО: Сохраняем состояние автоселла
-        settingsToSave.AutoServerHop = Settings.AutoServerHop  -- КРИТИЧНО: Сохраняем Auto Server Hop
-        settingsToSave.FarmItems = Settings.FarmItems
-        settingsToSave.SellItems = Settings.SellItems
-        settingsToSave.ESPSettings = ESPSettings
-        settingsToSave.ESPColors = {Box = {R = Colors.Box.R * 255, G = Colors.Box.G * 255, B = Colors.Box.B * 255}, Tracer = {R = Colors.Tracer.R * 255, G = Colors.Tracer.G * 255, B = Colors.Tracer.B * 255}, Name = {R = Colors.Name.R * 255, G = Colors.Name.G * 255, B = Colors.Name.B * 255}}
-        
-        local jsonData = game:GetService("HttpService"):JSONEncode(settingsToSave)
-        writefile("YBA_Enhanced_Settings.json", jsonData)
-    end)
+    -- УБРАНО: Локальное сохранение больше не нужно - все на сервере
+    SaveConfigToServer()
 end
 
--- КРИТИЧНО: Инициализируем Settings перед загрузкой
+-- КРИТИЧНО: Инициализируем Settings дефолтными значениями
 Settings = table_copy(DefaultSettings)
 
--- КРИТИЧНО: СНАЧАЛА пытаемся загрузить ПОЛНЫЙ конфиг с сервера
+-- КРИТИЧНО: Загружаем ПОЛНЫЙ конфиг с сервера (единственный источник настроек)
 local serverConfigLoaded = LoadConfigFromServer()
-
--- КРИТИЧНО: Загружаем локальный файл ТОЛЬКО если серверный конфиг НЕ загрузился
-if not serverConfigLoaded then
-    
-    loadSettings()
-else
-    
-end
 
 -- КРИТИЧНО: Применяем загруженные настройки к UI элементам
 task.spawn(function()
