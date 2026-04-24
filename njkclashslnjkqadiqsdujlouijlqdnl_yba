@@ -3371,25 +3371,13 @@ local function UpdateESP(player)
     local humanoid = character:FindFirstChild("Humanoid")
     if not rootPart or not humanoid or humanoid.Health <= 0 then HideESP(player) return end
     
-    -- ИСПРАВЛЕНО: Используем HumanoidRootPart.Position напрямую (без CFrame)
-    local rootPos = rootPart.Position
-    local pos, onScreen = Camera:WorldToViewportPoint(rootPos)
-    local distance = (rootPos - Camera.CFrame.Position).Magnitude
+    local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
     if not onScreen or distance > ESPSettings.MaxDistance or pos.Z <= 0 then HideESP(player) return end
     if ESPSettings.TeamCheck and player.Team == LocalPlayer.Team and not ESPSettings.ShowTeam then HideESP(player) return end
-    
-    -- ИСПРАВЛЕНО: Рассчитываем размер бокса на основе ЭКРАННЫХ координат (не мировых)
-    local size = character:GetExtentsSize()
-    local topPos = rootPos + Vector3.new(0, size.Y/2, 0)
-    local bottomPos = rootPos - Vector3.new(0, size.Y/2, 0)
-    local topScreen = Camera:WorldToViewportPoint(topPos)
-    local bottomScreen = Camera:WorldToViewportPoint(bottomPos)
-    local screenSize = math.abs(bottomScreen.Y - topScreen.Y)
-    local boxWidth = screenSize * 0.65
-    -- КРИТИЧНО: Используем среднее X между верхом и низом для точного центрирования
-    local centerX = (topScreen.X + bottomScreen.X) / 2
-    local boxPosition = Vector2.new(centerX - boxWidth/2, topScreen.Y)
-    local boxSize = Vector2.new(boxWidth, screenSize)
+    local size = character:GetExtentsSize() local cf = rootPart.CFrame
+    local top = Camera:WorldToViewportPoint((cf * CFrame.new(0, size.Y/2, 0)).Position) local bottom = Camera:WorldToViewportPoint((cf * CFrame.new(0, -size.Y/2, 0)).Position)
+    local screenSize = bottom.Y - top.Y local boxWidth = screenSize * 0.65 local boxPosition = Vector2.new(top.X - boxWidth/2, top.Y) local boxSize = Vector2.new(boxWidth, screenSize)
     for _, obj in pairs(esp.Box) do obj.Visible = false end
     if ESPSettings.BoxESP then
         if ESPSettings.BoxStyle == "Corner" then
@@ -5932,7 +5920,3 @@ else
         Duration = 5
     })
 end
-
-
-
-
