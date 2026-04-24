@@ -885,6 +885,58 @@ local function LoadConfigFromServer()
     return success and result
 end
 
+-- КРИТИЧНО: Функция применения конфига к UI элементам
+local function ApplyConfigToUI()
+    -- Ждем создания всех Options элементов
+    local maxWait = 10
+    local waited = 0
+    while waited < maxWait do
+        if Options and Options.Autofarm and Options.FarmItems and Options.Autosell and Options.SellItems then
+            break
+        end
+        task.wait(0.5)
+        waited = waited + 0.5
+    end
+    
+    if not Options then
+        return
+    end
+    
+    -- Флаг для предотвращения автосохранения при программной установке
+    local isApplyingConfig = true
+    
+    -- === AUTOFARM TAB ===
+    if Options.Autofarm and Settings.Autofarm ~= nil then
+        Options.Autofarm:SetValue(Settings.Autofarm)
+    end
+    
+    if Options.FarmItems and Settings.FarmItems then
+        Options.FarmItems:SetValue(Settings.FarmItems)
+    end
+    
+    if Options.Autosell and Settings.Autosell ~= nil then
+        Options.Autosell:SetValue(Settings.Autosell)
+    end
+    
+    if Options.SellItems and Settings.SellItems then
+        Options.SellItems:SetValue(Settings.SellItems)
+    end
+    
+    if Options.AutobuyLuckyArrow and Settings.AutobuyLuckyArrow ~= nil then
+        Options.AutobuyLuckyArrow:SetValue(Settings.AutobuyLuckyArrow)
+    end
+    
+    if Options.AutoServerHop and Settings.AutoServerHop ~= nil then
+        Options.AutoServerHop:SetValue(Settings.AutoServerHop)
+    end
+    
+    if Options.MoneyFarmEnabled and Settings.MoneyFarmEnabled ~= nil then
+        Options.MoneyFarmEnabled:SetValue(Settings.MoneyFarmEnabled)
+    end
+    
+    isApplyingConfig = false
+end
+
 local function loadSettings()
     local success, saved = pcall(function()
         return game:GetService("HttpService"):JSONDecode(readfile("YBA_Enhanced_Settings.json"))
@@ -950,6 +1002,12 @@ if not serverConfigLoaded then
 else
     
 end
+
+-- КРИТИЧНО: Применяем загруженные настройки к UI элементам
+task.spawn(function()
+    task.wait(3)  -- Ждем создания UI
+    ApplyConfigToUI()
+end)
 
 -- КРИТИЧНО: Инициализируем _G переменные при старте скрипта
 if _G.YBAAutoFarmEnabled == nil then
