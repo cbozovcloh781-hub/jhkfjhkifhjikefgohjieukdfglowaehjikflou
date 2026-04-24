@@ -586,7 +586,6 @@ local DefaultSettings = {
     FarmItems = {},
     FarmDelay = 0.5,  -- ИЗМЕНЕНО: 0.3 → 0.5 (задержка после успешного подбора)
     PickupAttempts = 2,  -- НОВОЕ: количество попыток подбора (было 10)
-    PickupAttemptDelay = 0.1,  -- НОВОЕ: задержка между попытками (было 0.05)
     AutobuyLuckyArrow = false,
     
     -- Autosell
@@ -751,7 +750,6 @@ local function SaveConfigToServer()
             farm_items = farm_items,
             farm_delay = Settings.FarmDelay,
             pickup_attempts = Settings.PickupAttempts,
-            pickup_attempt_delay = Settings.PickupAttemptDelay,
             autobuy_lucky_arrow = Settings.AutobuyLuckyArrow,
             
             -- Autosell
@@ -833,7 +831,6 @@ local function LoadConfigFromServer()
             if serverConfig.autofarm ~= nil then Settings.Autofarm = serverConfig.autofarm end
             if serverConfig.farm_delay then Settings.FarmDelay = serverConfig.farm_delay end
             if serverConfig.pickup_attempts then Settings.PickupAttempts = serverConfig.pickup_attempts end
-            if serverConfig.pickup_attempt_delay then Settings.PickupAttemptDelay = serverConfig.pickup_attempt_delay end
             if serverConfig.autobuy_lucky_arrow ~= nil then Settings.AutobuyLuckyArrow = serverConfig.autobuy_lucky_arrow end
             
             if serverConfig.farm_items then
@@ -933,7 +930,6 @@ local function ApplyConfigToUI()
     if Options.FarmItems and Settings.FarmItems then Options.FarmItems:SetValue(Settings.FarmItems) end
     if Options.FarmDelay and Settings.FarmDelay then Options.FarmDelay:SetValue(Settings.FarmDelay) end
     if Options.PickupAttempts and Settings.PickupAttempts then Options.PickupAttempts:SetValue(Settings.PickupAttempts) end
-    if Options.PickupAttemptDelay and Settings.PickupAttemptDelay then Options.PickupAttemptDelay:SetValue(Settings.PickupAttemptDelay) end
     if Options.AutobuyLuckyArrow and Settings.AutobuyLuckyArrow ~= nil then Options.AutobuyLuckyArrow:SetValue(Settings.AutobuyLuckyArrow) end
     
     -- Autosell
@@ -1987,17 +1983,17 @@ local function bypassTeleport(targetPos)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 35  -- было 40 (уменьшено на 12.5%)
-        stepDelay = 0.022  -- было 0.020 (увеличено на 10%)
+        stepSize = 30  -- было 35 (уменьшено на 14%)
+        stepDelay = 0.025  -- было 0.022 (увеличено на 14%)
     elseif distance < 300 then
-        stepSize = 42  -- было 50 (уменьшено на 16%)
-        stepDelay = 0.020  -- было 0.018 (увеличено на 11%)
+        stepSize = 36  -- было 42 (уменьшено на 14%)
+        stepDelay = 0.023  -- было 0.020 (увеличено на 15%)
     elseif distance < 600 then
-        stepSize = 50  -- было 60 (уменьшено на 16.7%)
-        stepDelay = 0.017  -- было 0.015 (увеличено на 13%)
+        stepSize = 43  -- было 50 (уменьшено на 14%)
+        stepDelay = 0.020  -- было 0.017 (увеличено на 18%)
     else
-        stepSize = 58  -- было 70 (уменьшено на 17%)
-        stepDelay = 0.014  -- было 0.012 (увеличено на 16.7%)
+        stepSize = 45  -- было 50 (уменьшено на 10%)
+        stepDelay = 0.020  -- было 0.017 (увеличено на 18%)
     end
     
     local direction = (targetPos - startPos).Unit
@@ -3386,11 +3382,11 @@ local function UpdateESP(player)
     local size = character:GetExtentsSize()
     local topPos = rootPos + Vector3.new(0, size.Y/2, 0)
     local bottomPos = rootPos - Vector3.new(0, size.Y/2, 0)
-    local top = Camera:WorldToViewportPoint(topPos)
-    local bottom = Camera:WorldToViewportPoint(bottomPos)
-    local screenSize = math.abs(bottom.Y - top.Y)
+    local topScreen = Camera:WorldToViewportPoint(topPos)
+    local bottomScreen = Camera:WorldToViewportPoint(bottomPos)
+    local screenSize = math.abs(bottomScreen.Y - topScreen.Y)
     local boxWidth = screenSize * 0.65
-    local boxPosition = Vector2.new(pos.X - boxWidth/2, top.Y)
+    local boxPosition = Vector2.new(pos.X - boxWidth/2, topScreen.Y)
     local boxSize = Vector2.new(boxWidth, screenSize)
     for _, obj in pairs(esp.Box) do obj.Visible = false end
     if ESPSettings.BoxESP then
@@ -4296,19 +4292,6 @@ AutoTab:AddSlider("PickupAttempts", {
     Rounding = 0,
     Callback = function(Value)
         Settings.PickupAttempts = Value
-        saveSettings()
-        SaveConfigToServer()
-    end
-})
-
-AutoTab:AddSlider("PickupAttemptDelay", {
-    Title = "Задержка между попытками (сек)",
-    Default = Settings.PickupAttemptDelay,
-    Min = 0.05,
-    Max = 0.5,
-    Rounding = 2,
-    Callback = function(Value)
-        Settings.PickupAttemptDelay = Value
         saveSettings()
         SaveConfigToServer()
     end
