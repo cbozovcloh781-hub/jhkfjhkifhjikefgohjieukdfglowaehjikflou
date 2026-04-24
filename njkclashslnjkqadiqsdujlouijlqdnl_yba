@@ -584,7 +584,9 @@ local DefaultSettings = {
     Autofarm = false,
     PickupRadius = 8,
     FarmItems = {},
-    FarmDelay = 0.3,
+    FarmDelay = 0.5,  -- ИЗМЕНЕНО: 0.3 → 0.5 (задержка после успешного подбора)
+    PickupAttempts = 2,  -- НОВОЕ: количество попыток подбора (было 10)
+    PickupAttemptDelay = 0.1,  -- НОВОЕ: задержка между попытками (было 0.05)
     AutobuyLuckyArrow = false,
     
     -- Autosell
@@ -888,14 +890,14 @@ end
 -- КРИТИЧНО: Функция применения конфига к UI элементам
 local function ApplyConfigToUI()
     -- Ждем создания всех Options элементов
-    local maxWait = 10
+    local maxWait = 5  -- УМЕНЬШЕНО с 10 до 5 секунд
     local waited = 0
     while waited < maxWait do
         if Options and Options.Autofarm and Options.FarmItems and Options.Autosell and Options.SellItems then
             break
         end
-        task.wait(0.5)
-        waited = waited + 0.5
+        task.wait(0.1)  -- УМЕНЬШЕНО с 0.5 до 0.1
+        waited = waited + 0.1
     end
     
     if not Options then
@@ -1005,7 +1007,7 @@ end
 
 -- КРИТИЧНО: Применяем загруженные настройки к UI элементам
 task.spawn(function()
-    task.wait(3)  -- Ждем создания UI
+    task.wait(0.5)  -- УМЕНЬШЕНА задержка с 3 до 0.5 секунд
     ApplyConfigToUI()
 end)
 
@@ -1996,21 +1998,21 @@ local function bypassTeleport(targetPos)
         return true
     end
     
-    -- ОПТИМАЛЬНАЯ СКОРОСТЬ (увеличена для быстрого фарма)
+    -- ОПТИМАЛЬНАЯ СКОРОСТЬ (уменьшена для предотвращения откатов)
     local stepSize, stepDelay
     
     if distance < 100 then
-        stepSize = 40  -- было 30
-        stepDelay = 0.020  -- было 0.025
+        stepSize = 35  -- было 40 (уменьшено на 12.5%)
+        stepDelay = 0.022  -- было 0.020 (увеличено на 10%)
     elseif distance < 300 then
-        stepSize = 50  -- было 36
-        stepDelay = 0.018  -- было 0.022
+        stepSize = 42  -- было 50 (уменьшено на 16%)
+        stepDelay = 0.020  -- было 0.018 (увеличено на 11%)
     elseif distance < 600 then
-        stepSize = 60  -- было 42
-        stepDelay = 0.015  -- было 0.019
+        stepSize = 50  -- было 60 (уменьшено на 16.7%)
+        stepDelay = 0.017  -- было 0.015 (увеличено на 13%)
     else
-        stepSize = 70  -- было 46
-        stepDelay = 0.012  -- было 0.016
+        stepSize = 58  -- было 70 (уменьшено на 17%)
+        stepDelay = 0.014  -- было 0.012 (увеличено на 16.7%)
     end
     
     local direction = (targetPos - startPos).Unit
@@ -3388,13 +3390,23 @@ local function UpdateESP(player)
     local humanoid = character:FindFirstChild("Humanoid")
     if not rootPart or not humanoid or humanoid.Health <= 0 then HideESP(player) return end
     
-    local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+    -- ИСПРАВЛЕНО: Используем HumanoidRootPart.Position напрямую (без CFrame)
+    local rootPos = rootPart.Position
+    local pos, onScreen = Camera:WorldToViewportPoint(rootPos)
+    local distance = (rootPos - Camera.CFrame.Position).Magnitude
     if not onScreen or distance > ESPSettings.MaxDistance or pos.Z <= 0 then HideESP(player) return end
     if ESPSettings.TeamCheck and player.Team == LocalPlayer.Team and not ESPSettings.ShowTeam then HideESP(player) return end
-    local size = character:GetExtentsSize() local cf = rootPart.CFrame
-    local top = Camera:WorldToViewportPoint((cf * CFrame.new(0, size.Y/2, 0)).Position) local bottom = Camera:WorldToViewportPoint((cf * CFrame.new(0, -size.Y/2, 0)).Position)
-    local screenSize = bottom.Y - top.Y local boxWidth = screenSize * 0.65 local boxPosition = Vector2.new(top.X - boxWidth/2, top.Y) local boxSize = Vector2.new(boxWidth, screenSize)
+    
+    -- ИСПРАВЛЕНО: Рассчитываем размер бокса на основе ЭКРАННЫХ координат (не мировых)
+    local size = character:GetExtentsSize()
+    local topPos = rootPos + Vector3.new(0, size.Y/2, 0)
+    local bottomPos = rootPos - Vector3.new(0, size.Y/2, 0)
+    local top = Camera:WorldToViewportPoint(topPos)
+    local bottom = Camera:WorldToViewportPoint(bottomPos)
+    local screenSize = math.abs(bottom.Y - top.Y)
+    local boxWidth = screenSize * 0.65
+    local boxPosition = Vector2.new(pos.X - boxWidth/2, top.Y)
+    local boxSize = Vector2.new(boxWidth, screenSize)
     for _, obj in pairs(esp.Box) do obj.Visible = false end
     if ESPSettings.BoxESP then
         if ESPSettings.BoxStyle == "Corner" then
@@ -4275,6 +4287,45 @@ AutoTab:AddSlider("CheaterDetectionSensitivity", {
         Settings.CheaterDetectionSensitivity = Value
         saveSettings()
         SaveConfigToServer()  -- Сохраняем на сервер
+    end
+})
+
+AutoTab:AddSlider("FarmDelay", {
+    Title = "Задержка после подбора (сек)",
+    Default = Settings.FarmDelay,
+    Min = 0.1,
+    Max = 2.0,
+    Rounding = 1,
+    Callback = function(Value)
+        Settings.FarmDelay = Value
+        saveSettings()
+        SaveConfigToServer()
+    end
+})
+
+AutoTab:AddSlider("PickupAttempts", {
+    Title = "Количество попыток подбора",
+    Default = Settings.PickupAttempts,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Callback = function(Value)
+        Settings.PickupAttempts = Value
+        saveSettings()
+        SaveConfigToServer()
+    end
+})
+
+AutoTab:AddSlider("PickupAttemptDelay", {
+    Title = "Задержка между попытками (сек)",
+    Default = Settings.PickupAttemptDelay,
+    Min = 0.05,
+    Max = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        Settings.PickupAttemptDelay = Value
+        saveSettings()
+        SaveConfigToServer()
     end
 })
 
