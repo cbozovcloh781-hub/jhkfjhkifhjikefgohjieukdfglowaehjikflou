@@ -2915,6 +2915,13 @@ function StartAutofarm()
                     local totalPoints = #itemSpawnPoints
                     
                     while isPatrolling and isAutofarmEnabled and pointsChecked < totalPoints do
+                        -- КРИТИЧНО: Проверяем появился ли предмет ПЕРЕД телепортом
+                        local checkPrompt, checkItem = FindNearestItem()
+                        if checkPrompt and checkItem then
+                            isPatrolling = false
+                            break
+                        end
+                        
                         -- Находим ближайшую непосещённую точку
                         local currentPos = rootPart.Position
                         local spawnPoint, spawnIndex = findNearestUnvisitedPoint(currentPos, visitedPoints)
@@ -2927,6 +2934,13 @@ function StartAutofarm()
                         end
                         
                         if spawnPoint and spawnIndex then
+                            -- КРИТИЧНО: Проверяем появился ли предмет ПЕРЕД телепортом
+                            local checkPrompt, checkItem = FindNearestItem()
+                            if checkPrompt and checkItem then
+                                isPatrolling = false
+                                break
+                            end
+                            
                             -- Отмечаем точку как посещённую
                             visitedPoints[spawnIndex] = true
                             pointsChecked = pointsChecked + 1
@@ -4906,72 +4920,7 @@ if Settings.CustomConsole then
     end)
 end
 
-if Settings.Autofarm and not _G.YBAAutoRestart then
-    task.spawn(function()
-        task.wait(5)
-        
-        -- КРИТИЧНО: Ждём полной загрузки персонажа
-        local character = Player.Character
-        if not character then
-            Player.CharacterAdded:Wait()
-            character = Player.Character
-        end
-        
-        local waitTime = 0
-        while waitTime < 10 do
-            if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                if humanoid.Health > 0 then
-                    break
-                end
-            end
-            task.wait(0.5)
-            waitTime = waitTime + 0.5
-        end
-        
-        task.wait(2) -- Дополнительная задержка для полной загрузки
-        
-        if Options and Options.Autofarm and Settings.FarmItems and next(Settings.FarmItems) then
-            -- КРИТИЧНО: Полный сброс ПЕРЕД автозапуском
-            ResetTeleportVariables()
-            
-            if isAutofarmEnabled then
-                StopAutofarm()
-                task.wait(3)
-            end
-            
-            -- Очистка персонажа
-            pcall(function()
-                local char = Player.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    local rootPart = char.HumanoidRootPart
-                    for _, obj in pairs(rootPart:GetChildren()) do
-                        if obj:IsA("BodyPosition") or obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") then
-                            obj:Destroy()
-                        end
-                    end
-                    rootPart.Anchored = false
-                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                end
-            end)
-            
-            task.wait(1)
-            
-            -- Ещё один сброс после очистки
-            ResetTeleportVariables()
-            
-            pcall(function()
-                if Options.Autofarm and Options.Autofarm.SetValue then
-                    Options.Autofarm:SetValue(true)
-                end
-            end)
-            if StartAutofarm then
-                StartAutofarm()
-            end
-        end
-    end)
-end
+-- Автозапуск автофарма убран - он запускается через Options.Autofarm:SetValue в блоке ниже
 
 if Settings.Autosell and not _G.YBAAutoRestart then
     task.spawn(function()
