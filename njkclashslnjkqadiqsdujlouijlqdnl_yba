@@ -2719,6 +2719,15 @@ function StartAutofarm()
                     onPlatform = false
                     isPatrolling = false
                     
+                    -- КРИТИЧНО: Удаляем старый BodyVelocity перед созданием нового
+                    pcall(function()
+                        for _, obj in pairs(rootPart:GetChildren()) do
+                            if obj:IsA("BodyVelocity") then
+                                obj:Destroy()
+                            end
+                        end
+                    end)
+                    
                     -- Проверяем новая ли это координата
                     local itemPos = item.Position
                     if isNewCoordinate(itemPos) then
@@ -2878,18 +2887,8 @@ function StartAutofarm()
                         end
                     end)
                     
-                    task.wait(0.1)
-                    
-                    -- КРИТИЧНО: Финальное удержание позиции перед разблокировкой
-                    rootPart.CFrame = CFrame.new(pickupPosition)
-                    bodyVel.Velocity = Vector3.new(0, 0, 0)
-                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                    rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    
-                    task.wait(0.2)
-                    
-                    -- КРИТИЧНО: Удаляем BodyVelocity ТОЛЬКО ПОСЛЕ всех попыток
-                    pcall(function() bodyVel:Destroy() end)
+                    -- КРИТИЧНО: НЕ удаляем BodyVelocity сразу, оставляем его работать
+                    -- Он будет удален только перед следующим телепортом
                     
                     pcall(function() tempPlatform:Destroy() end)
                     
@@ -2945,6 +2944,15 @@ function StartAutofarm()
                             -- Отмечаем точку как посещённую
                             visitedPoints[spawnIndex] = true
                             pointsChecked = pointsChecked + 1
+                        
+                        -- Удаляем старый BodyVelocity перед телепортом
+                        pcall(function()
+                            for _, obj in pairs(rootPart:GetChildren()) do
+                                if obj:IsA("BodyVelocity") then
+                                    obj:Destroy()
+                                end
+                            end
+                        end)
                         
                         -- Телепортируемся на 8 единиц ниже точки спавна
                         local targetPos = spawnPoint.Position - Vector3.new(0, 8, 0)
@@ -3031,7 +3039,13 @@ function StartAutofarm()
                                             bypassTeleport(itemTargetPos)
                                             
                                             -- Удаляем старый BodyVelocity
-                                            pcall(function() bodyVel:Destroy() end)
+                                            pcall(function()
+                                                for _, obj in pairs(rootPart:GetChildren()) do
+                                                    if obj:IsA("BodyVelocity") then
+                                                        obj:Destroy()
+                                                    end
+                                                end
+                                            end)
                                             
                                             -- Создаём новый BodyVelocity
                                             bodyVel = Instance.new("BodyVelocity")
@@ -3114,9 +3128,15 @@ function StartAutofarm()
                             end
                         end
                         
-                        -- Удаляем BodyVelocity
+                        -- Удаляем BodyVelocity перед выходом из патрулирования
                         if bodyVel then
-                            pcall(function() bodyVel:Destroy() end)
+                            pcall(function()
+                                for _, obj in pairs(rootPart:GetChildren()) do
+                                    if obj:IsA("BodyVelocity") then
+                                        obj:Destroy()
+                                    end
+                                end
+                            end)
                         end
                         
                         -- Если нашли предметы в режиме All, остаёмся на этой точке ещё немного
@@ -4236,6 +4256,19 @@ Options.FarmItems = FarmingLeft:AddDropdown({
     Multi = true,
     Callback = function(Value)
         if type(Value) == "table" then
+            -- Если выбран All и есть другие предметы, убираем All
+            if Value["All"] then
+                local hasOthers = false
+                for item, selected in pairs(Value) do
+                    if selected and item ~= "All" then
+                        hasOthers = true
+                        break
+                    end
+                end
+                if hasOthers then
+                    Value["All"] = false
+                end
+            end
             Settings.FarmItems = Value
             SaveConfigToServer()
             _G.YBAFarmItems = Value
@@ -4296,6 +4329,19 @@ Options.SellItems = FarmingLeft:AddDropdown({
     Multi = true,
     Callback = function(Value)
         if type(Value) == "table" then
+            -- Если выбран All и есть другие предметы, убираем All
+            if Value["All"] then
+                local hasOthers = false
+                for item, selected in pairs(Value) do
+                    if selected and item ~= "All" then
+                        hasOthers = true
+                        break
+                    end
+                end
+                if hasOthers then
+                    Value["All"] = false
+                end
+            end
             Settings.SellItems = Value
             SaveConfigToServer()
             _G.YBASellItems = Value
