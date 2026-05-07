@@ -619,8 +619,8 @@ local isJumpHacking = false
 local jumpHackConnections = {}
 local isAutofarmEnabled = false
 local autofarmConnections = {}
-local farmItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Lucky Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Lucky Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio Diary", "Gold Coin", "Diamond"}
-local sellItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio Diary", "Gold Coin", "Diamond"}
+local farmItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Lucky Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Lucky Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio's Diary", "Gold Coin", "Diamond", "Clackers"}
+local sellItemsList = {"All", "Rokakaka", "Pure Rokakaka", "Mysterious Arrow", "Zepelin's Headband", "Quinton's Glove", "Ancient Scroll", "Stone Mask", "Rib Cage of the Saint's Corpse", "Steel Ball", "Dio's Diary", "Gold Coin", "Diamond", "Clackers"}
 local isAutosellEnabled = false
 local autosellConnections = {}
 local isAutobuyEnabled = false
@@ -661,9 +661,10 @@ local itemPrices = {
     ["Lucky Stone Mask"] = 0,
     ["Rib Cage of the Saint's Corpse"] = 1200,
     ["Steel Ball"] = 1000,
-    ["Dio Diary"] = 1000,
+    ["Dio's Diary"] = 1000,
     ["Gold Coin"] = 120,
-    ["Diamond"] = 500
+    ["Diamond"] = 500,
+    ["Clackers"] = 1000
 }
 
 -- Farm statistics
